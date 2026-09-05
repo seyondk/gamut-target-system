@@ -20,9 +20,9 @@ const I18N = {
         app_title: "广色域打点测试与补差分析系统",
         meter_checking: "探头状态检查中...",
         meter_connected: "硬件色度计已连接",
-        meter_missing: "未检测到色度计探头",
+        meter_missing: "未检测到物理探头",
         val_btn: "标准原色校准验证",
-        tv_window_btn: "打开电视靶窗",
+        tv_window_btn: "打开测色靶窗",
         export_csv_btn: "导出 CSV",
         export_png_btn: "导出 4K PNG",
         export_svg_btn: "导出矢量图 (SVG)",
@@ -32,7 +32,10 @@ const I18N = {
         chart_fullscreen: "全屏放大查看",
         chart_exit_fullscreen: "✕ 退出全屏 [ESC]",
         chart_tip: "提示: 滚轮自由缩放，按住左键拖拽平移",
-        stat_exceeded: "超 P3 点数",
+        chk_spectrum: "显示彩色底图",
+        chk_locus: "光谱轨迹",
+        chk_labels: "编号标号",
+        stat_exceeded: "超 DCI-P3 点位数",
         stat_avg_dxy: "平均偏差 Δxy",
         stat_avg_duv: "平均色差 Δu'v'",
         stat_progress: "已测进度",
@@ -84,14 +87,30 @@ const I18N = {
         tip_measured_cell: "双击可手动录入实测值",
         tip_effective_target: "计入微调补差后实际送往电视靶窗的色彩坐标",
         lbl_effective_target: "实际靶向",
-        val_modal_title: "标准原色校准校对验证",
+        modal_add_title: "新建自定义测试坐标点",
+        modal_lbl_name: "点位名称说明:",
+        modal_lbl_x: "需求值 x (0.0 ~ 1.0):",
+        modal_lbl_y: "需求值 y (0.0 ~ 1.0):",
+        btn_cancel: "取消",
+        btn_save_add: "保存并添加到测试",
+        val_modal_title: "🎯 标准原色校准与探头偏差验证",
+        val_modal_desc: "测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色。若屏幕在标准域已出厂校准且探头工作正常，此处实测偏差将极小 (Δxy ≤ 0.003)。",
         val_badge_excellent: "校准极佳",
         val_badge_good: "良好达标",
         val_badge_deviation: "超差偏置",
-        val_badge_pending: "待测",
+        val_badge_pending: "待验证",
         val_measure_btn: "测此项",
         val_all_btn: "一键全测标准原色 (7色)",
-        val_reset_btn: "重置记录"
+        val_reset_btn: "重置记录",
+        val_ready: "就绪",
+        val_th_primary: "基准原色",
+        val_th_target: "标准目标 (x, y)",
+        val_th_measured: "物理实测 (x, y)",
+        val_th_luminance: "亮度 (nits)",
+        val_th_delta: "偏差 Δxy",
+        val_th_verdict: "评定",
+        val_th_action: "操作",
+        btn_close: "关闭"
     },
     en: {
         app_title: "Wide Gamut Target Testing & Offset Analysis System",
@@ -99,7 +118,7 @@ const I18N = {
         meter_connected: "Colorimeter Connected",
         meter_missing: "Colorimeter Disconnected",
         val_btn: "Primary Calibration Validation",
-        tv_window_btn: "Open TV Patch Window",
+        tv_window_btn: "Open Target Patch",
         export_csv_btn: "Export CSV",
         export_png_btn: "Export 4K PNG",
         export_svg_btn: "Export Vector (SVG)",
@@ -109,6 +128,9 @@ const I18N = {
         chart_fullscreen: "Fullscreen View",
         chart_exit_fullscreen: "✕ Exit Fullscreen [ESC]",
         chart_tip: "Tip: Scroll to zoom, left-click & drag to pan",
+        chk_spectrum: "Color Spectrum Overlay",
+        chk_locus: "Spectral Locus",
+        chk_labels: "Point Labels",
         stat_exceeded: "Exceeded P3 Points",
         stat_avg_dxy: "Avg Delta xy",
         stat_avg_duv: "Avg Delta u'v'",
@@ -161,14 +183,30 @@ const I18N = {
         tip_measured_cell: "Double-click to manually enter measured value",
         tip_effective_target: "Effective coordinates sent to target window after offsets",
         lbl_effective_target: "Effective Target",
-        val_modal_title: "Primary Color & Colorimeter Validation",
+        modal_add_title: "Add Custom Target Coordinate",
+        modal_lbl_name: "Target Name / Label:",
+        modal_lbl_x: "Target x (0.0 ~ 1.0):",
+        modal_lbl_y: "Target y (0.0 ~ 1.0):",
+        btn_cancel: "Cancel",
+        btn_save_add: "Save & Add to Test",
+        val_modal_title: "🎯 Primary Calibration & Probe Validation",
+        val_modal_desc: "Evaluates DCI-P3 D65 white point, RGBW and CMY reference primaries. Factory calibrated displays paired with an accurate colorimeter yield negligible deviation (Δxy ≤ 0.003).",
         val_badge_excellent: "EXCELLENT",
         val_badge_good: "GOOD",
         val_badge_deviation: "DEVIATION",
         val_badge_pending: "PENDING",
         val_measure_btn: "Test Item",
         val_all_btn: "Measure All Primaries (7 Colors)",
-        val_reset_btn: "Reset Records"
+        val_reset_btn: "Reset Records",
+        val_ready: "Ready",
+        val_th_primary: "Reference Primary",
+        val_th_target: "Target (x, y)",
+        val_th_measured: "Measured (x, y)",
+        val_th_luminance: "Luminance (nits)",
+        val_th_delta: "Delta xy",
+        val_th_verdict: "Verdict",
+        val_th_action: "Action",
+        btn_close: "Close"
     }
 };
 
@@ -183,11 +221,28 @@ function toggleLanguage() {
     applyTranslations();
 }
 
+function updateMeterDisplay() {
+    const dot = document.getElementById('meter-dot');
+    const label = document.getElementById('meter-label');
+    if (!dot || !label) return;
+    const info = appState.meter_info;
+    if (info && info.has_hardware) {
+        dot.className = 'dot dot-green';
+        label.innerText = currentLang === 'en' ? 'Colorimeter Connected' : '硬件色度计已连接';
+    } else if (info) {
+        dot.className = 'dot dot-purple';
+        label.innerText = currentLang === 'en' ? 'Colorimeter Disconnected' : '未检测到物理探头';
+    } else {
+        dot.className = 'dot dot-purple';
+        label.innerText = currentLang === 'en' ? 'Checking probe status...' : '探头状态检查中...';
+    }
+}
+
 function applyTranslations() {
-    // Update language toggle button text
+    // Update language toggle button text: when currently in Chinese, show '🌐 English' so English speakers know where to click!
     const btnLang = document.getElementById('btn-lang-toggle');
     if (btnLang) {
-        btnLang.innerText = currentLang === 'en' ? '🌐 English' : '🌐 简体中文';
+        btnLang.innerText = currentLang === 'en' ? '🌐 中文' : '🌐 English';
     }
 
     // Update document title
@@ -200,6 +255,24 @@ function applyTranslations() {
             el.innerText = I18N[currentLang][key];
         }
     });
+
+    // Update select options
+    const selDelay = document.getElementById('select-auto-delay');
+    if (selDelay && selDelay.options.length >= 4) {
+        selDelay.options[0].text = currentLang === 'en' ? '2.0 s' : '2.0 秒';
+        selDelay.options[1].text = currentLang === 'en' ? '3.0 s (Recommended)' : '3.0 秒 (推荐)';
+        selDelay.options[2].text = currentLang === 'en' ? '4.0 s' : '4.0 秒';
+        selDelay.options[3].text = currentLang === 'en' ? '5.0 s' : '5.0 秒';
+    }
+
+    const selContainer = document.getElementById('select-container');
+    if (selContainer && selContainer.options.length >= 2) {
+        selContainer.options[0].text = currentLang === 'en' ? 'Native Passthrough (Unclipped)' : 'Native 原生直通 (无截断)';
+        selContainer.options[1].text = currentLang === 'en' ? 'BT.2020 (Recommended/Wide Gamut)' : 'BT.2020 (推荐/广色域)';
+    }
+
+    // Update meter status
+    updateMeterDisplay();
 
     // Update chart language
     if (chart && chart.setLanguage) {
@@ -214,6 +287,18 @@ function applyTranslations() {
     }
 }
 
+async function loadInitialState() {
+    try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+            const data = await res.json();
+            handleServerEvent({ type: 'INIT_STATE', state: data });
+        }
+    } catch (e) {
+        console.warn("Could not pre-fetch /api/state, waiting for WebSocket:", e);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     chart = new CIE1931Chart('cie-canvas');
 
@@ -222,6 +307,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
 
     applyTranslations();
+    loadInitialState();
     connectWebSocket();
 });
 
@@ -279,8 +365,9 @@ function handleServerEvent(msg) {
     switch (msg.type) {
         case 'INIT_STATE':
             appState.settings = msg.state.settings;
-            appState.points = msg.state.points;
+            appState.points = msg.state.points || [];
             appState.black_baseline = msg.state.black_baseline;
+            appState.meter_info = msg.state.meter_info || msg.state.instrument_status;
             if (msg.state.validation_primaries) {
                 appState.validation_primaries = msg.state.validation_primaries;
             }
@@ -373,16 +460,10 @@ function handleServerEvent(msg) {
 }
 
 function updateUIFromState(stateData) {
-    // Meter Status
-    const dot = document.getElementById('meter-dot');
-    const label = document.getElementById('meter-label');
-    if (stateData.meter_info && stateData.meter_info.has_hardware) {
-        dot.className = 'dot dot-green';
-        label.innerText = currentLang === 'en' ? 'Colorimeter Connected' : '硬件色度计已连接';
-    } else {
-        dot.className = 'dot dot-purple';
-        label.innerText = currentLang === 'en' ? 'Colorimeter Disconnected' : '未检测到物理探头';
+    if (stateData) {
+        appState.meter_info = stateData.meter_info || stateData.instrument_status || appState.meter_info;
     }
+    updateMeterDisplay();
 
     // Controls
     if (stateData.settings) {

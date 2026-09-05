@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>外接电视专属测色靶窗 - 广色域打点测试与补差分析系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测色靶窗</title>
+    <style>
         * {
             box-sizing: border-box;
             margin: 0;
@@ -450,9 +452,9 @@
         let currentLang = localStorage.getItem('app_lang') || 'zh';
         const I18N = {
             zh: {
-                page_title: "外接电视专属测色靶窗 - 广色域打点测试与补差分析系统",
+                page_title: "测色靶窗",
                 crosshair: "探头校色对准框",
-                hud_title: "外接电视测色靶窗 (TV HDMI Target)",
+                hud_title: "测色靶窗 (TV HDMI Target)",
                 hdr_mode: "HDR 模式 (BT.2020)",
                 sdr_mode: "SDR 模式",
                 lbl_status: "状态",
@@ -484,9 +486,9 @@
                 complete_tip: "[ 点击任意处或按任意键退出提醒 ]"
             },
             en: {
-                page_title: "TV Target Window - Wide Gamut Target Testing & Offset Analysis System",
+                page_title: "Target Patch",
                 crosshair: "Probe Alignment Target",
-                hud_title: "TV Target Window (HDMI Target)",
+                hud_title: "Target Patch (HDMI Target)",
                 hdr_mode: "HDR Mode (BT.2020)",
                 sdr_mode: "SDR Mode",
                 lbl_status: "Status",

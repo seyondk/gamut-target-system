@@ -253,6 +253,7 @@ class SettingsUpdateModel(BaseModel):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    meter_status = meter.detect_instruments(force_refresh=False)
     await websocket.send_json({
         "type": "INIT_STATE",
         "state": {
@@ -262,7 +263,8 @@ async def websocket_endpoint(websocket: WebSocket):
             "active_patch": state.active_patch,
             "color_spaces": COLOR_SPACES,
             "spectral_locus": SPECTRAL_LOCUS_380_700,
-            "instrument_status": meter.detect_instruments(),
+            "instrument_status": meter_status,
+            "meter_info": meter_status,
             "ccss_files": meter.get_available_ccss_files(),
             "validation_primaries": state.validation_primaries,
             "validation_summary": state.get_validation_summary()
@@ -277,6 +279,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/api/state")
 def get_state():
+    meter_status = meter.detect_instruments(force_refresh=False)
     return {
         "settings": state.settings,
         "points": state.points,
@@ -284,11 +287,18 @@ def get_state():
         "active_patch": state.active_patch,
         "color_spaces": COLOR_SPACES,
         "spectral_locus": SPECTRAL_LOCUS_380_700,
-        "instrument_status": meter.detect_instruments(),
+        "instrument_status": meter_status,
+        "meter_info": meter_status,
         "ccss_files": meter.get_available_ccss_files(),
         "validation_primaries": state.validation_primaries,
         "validation_summary": state.get_validation_summary()
     }
+
+
+@app.get("/api/meter/status")
+def get_meter_status(refresh: bool = False):
+    status = meter.detect_instruments(force_refresh=refresh)
+    return status
 
 
 @app.post("/api/settings")

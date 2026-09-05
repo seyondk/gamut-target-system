@@ -695,19 +695,19 @@
         </div>
 
         <div class="header-actions">
-            <!-- Language Switcher Button -->
-            <button class="btn btn-sm" id="btn-lang-toggle" onclick="toggleLanguage()" style="border-color:#38bdf8; color:#38bdf8; font-weight:600;" title="切换语言 / Switch Language">
-                🌐 EN / 中文
+            <!-- Language Switcher Button: shows '🌐 English' when in Chinese, '🌐 中文' when in English -->
+            <button class="btn" id="btn-lang-toggle" onclick="toggleLanguage()" title="Switch Language / 切换语言">
+                🌐 English
             </button>
 
-            <!-- Hardware / Simulated Mode Indicator -->
+            <!-- Hardware Mode Indicator -->
             <div class="status-pill" id="meter-status-pill">
                 <span class="dot dot-purple" id="meter-dot"></span>
-                <span id="meter-label" data-i18n="meter_checking">探头状态检查中...</span>
+                <span id="meter-label">探头状态检查中...</span>
             </div>
 
             <!-- Standard Primaries & Calibration Validation -->
-            <button class="btn btn-sm" onclick="openValidationModal()" style="border-color:var(--accent-cyan); color:var(--accent-cyan);" title="测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色偏差，验证屏幕出厂校色水准与探头可靠度">
+            <button class="btn" id="btn-val-open" onclick="openValidationModal()" title="测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色偏差，验证屏幕出厂校色水准与探头可靠度">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <circle cx="12" cy="12" r="4"></circle>
@@ -715,24 +715,24 @@
                 <span data-i18n="val_btn">标准原色校准验证</span>
             </button>
 
-            <!-- Launch TV Patch Window -->
-            <button class="btn btn-primary" onclick="openTVPatchWindow()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- Launch Target Patch Window -->
+            <button class="btn" id="btn-open-patch" onclick="openTVPatchWindow()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                     <line x1="8" y1="21" x2="16" y2="21"></line>
                     <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
-                <span data-i18n="tv_window_btn">打开电视靶窗</span>
+                <span data-i18n="tv_window_btn">打开测色靶窗</span>
             </button>
 
             <!-- Export Actions -->
-            <button class="btn btn-sm" onclick="exportCSV()" title="导出完整测试数据为 Excel/CSV" data-i18n="export_csv_btn">
+            <button class="btn" onclick="exportCSV()" title="导出完整测试数据为 Excel/CSV" data-i18n="export_csv_btn">
                 导出 CSV
             </button>
-            <button class="btn btn-sm" onclick="exportHighResPNG()" title="导出 3000x3000 4K 高分辨率色域图 (无UI遮挡)" data-i18n="export_png_btn">
+            <button class="btn" onclick="exportHighResPNG()" title="导出 3000x3000 4K 高分辨率色域图 (无UI遮挡)" data-i18n="export_png_btn">
                 导出 4K PNG
             </button>
-            <button class="btn btn-sm" onclick="exportSVG()" title="导出无限放大无损的通用矢量图 (任何浏览器可直接双击查看)" data-i18n="export_svg_btn">
+            <button class="btn" onclick="exportSVG()" title="导出无限放大无损的通用矢量图 (任何浏览器可直接双击查看)" data-i18n="export_svg_btn">
                 导出矢量图 (SVG)
             </button>
         </div>
@@ -747,16 +747,16 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="12 2 2 22 22 22"></polygon>
                     </svg>
-                    CIE 1931 色度图 (缩放与拖拽视图)
+                    <span data-i18n="chart_title">CIE 1931 色度图 (缩放与拖拽视图)</span>
                 </h2>
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <button class="btn btn-sm" id="btn-fit-gamut" onclick="chart.fitGamut()" title="聚焦填满色域 (图2样式)">聚焦色域</button>
-                    <button class="btn btn-sm" onclick="chart.resetView()" title="重置为完整全局坐标视图">复位全图</button>
+                    <button class="btn btn-sm" id="btn-fit-gamut" onclick="chart.fitGamut()" title="聚焦填满色域" data-i18n="chart_fit">聚焦色域</button>
+                    <button class="btn btn-sm" onclick="chart.resetView()" title="重置为完整全局坐标视图" data-i18n="chart_reset">复位全图</button>
                     <button class="btn btn-sm btn-primary" id="btn-chart-fullscreen" onclick="toggleChartFullscreen()" title="全屏沉浸式放大查看色度图">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                         </svg>
-                        全屏放大查看
+                        <span data-i18n="chart_fullscreen">全屏放大查看</span>
                     </button>
                 </div>
             </div>
@@ -764,7 +764,7 @@
             <div class="card-body chart-wrapper">
                 <!-- Canvas Toolbar with Zoom controls -->
                 <div class="canvas-toolbar">
-                    <span style="color:var(--text-muted); font-size:11px;">提示: 滚轮自由缩放，按住左键拖拽平移</span>
+                    <span style="color:var(--text-muted); font-size:11px;" id="lbl-chart-tip" data-i18n="chart_tip">提示: 滚轮自由缩放，按住左键拖拽平移</span>
                     <div class="zoom-btn-group">
                         <button class="btn btn-sm" onclick="chart.zoomIn()" title="放大">+</button>
                         <button class="btn btn-sm" onclick="chart.zoomOut()" title="缩小">-</button>
@@ -778,7 +778,7 @@
                     <label class="checkbox-label" title="开启/关闭马蹄形内部 CIE 真实彩色连续光谱底图">
                         <input type="checkbox" id="chk-spectrum" checked onchange="updateGamutToggles()">
                         <span class="color-tag" style="background: linear-gradient(135deg, #ef4444, #22c55e, #3b82f6);"></span>
-                        <strong>显示彩色底图</strong>
+                        <strong data-i18n="chk_spectrum">显示彩色底图</strong>
                     </label>
                     <label class="checkbox-label">
                         <input type="checkbox" id="chk-p3" checked onchange="updateGamutToggles()">
@@ -793,11 +793,11 @@
                     <label class="checkbox-label">
                         <input type="checkbox" id="chk-locus" checked onchange="updateGamutToggles()">
                         <span class="color-tag" style="background:#94a3b8;"></span>
-                        光谱轨迹
+                        <span data-i18n="chk_locus">光谱轨迹</span>
                     </label>
                     <label class="checkbox-label">
                         <input type="checkbox" id="chk-labels" checked onchange="updateGamutToggles()">
-                        编号标号
+                        <span data-i18n="chk_labels">编号标号</span>
                     </label>
                 </div>
 
@@ -805,19 +805,19 @@
                 <div class="stats-grid" style="width: 100%;">
                     <div class="stat-card">
                         <div class="stat-value" id="stat-exceeded-count" style="color: var(--accent-green);">0 / 15</div>
-                        <div class="stat-label">超 DCI-P3 点位数</div>
+                        <div class="stat-label" data-i18n="stat_exceeded">超 DCI-P3 点位数</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="stat-avg-dxy">--</div>
-                        <div class="stat-label">平均偏差 Δxy</div>
+                        <div class="stat-label" data-i18n="stat_avg_dxy">平均偏差 Δxy</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="stat-avg-duv">--</div>
-                        <div class="stat-label">平均色差 Δu'v'</div>
+                        <div class="stat-label" data-i18n="stat_avg_duv">平均色差 Δu'v'</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="stat-tested-count">0 / 15</div>
-                        <div class="stat-label">已测进度</div>
+                        <div class="stat-label" data-i18n="stat_progress">已测进度</div>
                     </div>
                 </div>
             </div>
@@ -832,17 +832,11 @@
                         <line x1="3" y1="9" x2="21" y2="9"></line>
                         <line x1="9" y1="21" x2="9" y2="9"></line>
                     </svg>
-                <h2 data-i18n="table_card_title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                        <line x1="9" y1="21" x2="9" y2="9"></line>
-                    </svg>
-                    测试坐标与测量微调分析表
+                    <span data-i18n="table_card_title">测试坐标与测量微调分析表</span>
                 </h2>
                 <div style="display:flex; gap:6px;">
-                    <button class="btn btn-sm btn-primary" onclick="openAddPointModal()" data-i18n="btn_add_point">+ 新增自定义坐标点</button>
-                    <button class="btn btn-sm" id="btn-restore-points" onclick="restoreDefaultPoints()" style="border-color:#38bdf8; color:#38bdf8;" data-i18n="btn_restore_points" title="恢复为默认的 P1-P15 测试坐标">恢复默认点位</button>
+                    <button class="btn btn-sm" onclick="openAddPointModal()" data-i18n="btn_add_point">+ 新增自定义坐标点</button>
+                    <button class="btn btn-sm" id="btn-restore-points" onclick="restoreDefaultPoints()" data-i18n="btn_restore_points" title="恢复为默认的 P1-P15 测试坐标">恢复默认点位</button>
                     <button class="btn btn-sm btn-danger" onclick="resetAllPoints()" data-i18n="btn_reset_data">重置数据</button>
                 </div>
             </div>
@@ -954,24 +948,24 @@
     <!-- Modal Form for Adding Custom Coordinates -->
     <div class="modal-overlay" id="modal-add-point">
         <div class="modal-box">
-            <h3>新建自定义测试坐标点</h3>
+            <h3 data-i18n="modal_add_title">新建自定义测试坐标点</h3>
             <div class="form-group">
-                <label>点位名称说明:</label>
+                <label data-i18n="modal_lbl_name">点位名称说明:</label>
                 <input type="text" id="modal-point-name" placeholder="例如: 极限饱和红色点 / P3 边界点">
             </div>
             <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <div>
-                    <label>需求值 x (0.0 ~ 1.0):</label>
+                    <label data-i18n="modal_lbl_x">需求值 x (0.0 ~ 1.0):</label>
                     <input type="number" id="modal-point-x" step="0.0001" placeholder="0.6800">
                 </div>
                 <div>
-                    <label>需求值 y (0.0 ~ 1.0):</label>
+                    <label data-i18n="modal_lbl_y">需求值 y (0.0 ~ 1.0):</label>
                     <input type="number" id="modal-point-y" step="0.0001" placeholder="0.3200">
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeAddPointModal()">取消</button>
-                <button class="btn btn-primary" onclick="submitAddPoint()">保存并添加到测试</button>
+                <button class="btn" onclick="closeAddPointModal()" data-i18n="btn_cancel">取消</button>
+                <button class="btn btn-primary" onclick="submitAddPoint()" data-i18n="btn_save_add">保存并添加到测试</button>
             </div>
         </div>
     </div>
@@ -981,8 +975,8 @@
         <div class="modal-box modal-lg">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                 <div>
-                    <h3 style="margin-bottom:4px; font-size:16px;">🎯 标准原色校准与探头偏差验证</h3>
-                    <p style="font-size:12px; color:var(--text-muted); line-height:1.4;">
+                    <h3 style="margin-bottom:4px; font-size:16px;" data-i18n="val_modal_title">🎯 标准原色校准与探头偏差验证</h3>
+                    <p style="font-size:12px; color:var(--text-muted); line-height:1.4;" data-i18n="val_modal_desc">
                         测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色。若屏幕在标准域已出厂校准且探头工作正常，此处实测偏差将极小 (Δxy ≤ 0.003)。
                     </p>
                 </div>
@@ -995,10 +989,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                    一键全测标准原色 (7色)
+                    <span data-i18n="val_all_btn">一键全测标准原色 (7色)</span>
                 </button>
-                <button class="btn btn-sm" onclick="resetValidation()">重置记录</button>
-                <span id="val-progress-text" style="font-size:12px; color:var(--accent-blue); margin-left:auto;">就绪</span>
+                <button class="btn btn-sm" onclick="resetValidation()" data-i18n="val_reset_btn">重置记录</button>
+                <span id="val-progress-text" style="font-size:12px; color:var(--accent-blue); margin-left:auto;" data-i18n="val_ready">就绪</span>
             </div>
 
             <!-- Primaries Table -->
@@ -1006,13 +1000,13 @@
                 <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
                     <thead style="background:var(--bg-tertiary); position:sticky; top:0; z-index:2;">
                         <tr>
-                            <th style="padding:8px 10px;">基准原色</th>
-                            <th style="padding:8px 10px;">标准目标 (x, y)</th>
-                            <th style="padding:8px 10px;">物理实测 (x, y)</th>
-                            <th style="padding:8px 10px;">亮度 (nits)</th>
-                            <th style="padding:8px 10px;">偏差 Δxy</th>
-                            <th style="padding:8px 10px;">评定</th>
-                            <th style="padding:8px 10px; text-align:right;">操作</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_primary">基准原色</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_target">标准目标 (x, y)</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_measured">物理实测 (x, y)</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_luminance">亮度 (nits)</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_delta">偏差 Δxy</th>
+                            <th style="padding:8px 10px;" data-i18n="val_th_verdict">评定</th>
+                            <th style="padding:8px 10px; text-align:right;" data-i18n="val_th_action">操作</th>
                         </tr>
                     </thead>
                     <tbody id="val-table-body">
@@ -1036,7 +1030,7 @@
             </div>
 
             <div class="modal-actions" style="margin-top:14px;">
-                <button class="btn btn-sm" onclick="closeValidationModal()">关闭</button>
+                <button class="btn btn-sm" onclick="closeValidationModal()" data-i18n="btn_close">关闭</button>
             </div>
         </div>
     </div>

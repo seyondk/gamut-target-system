@@ -63,13 +63,14 @@ class MeterDriver:
         self.black_baseline: Optional[Dict[str, float]] = None
         self.selected_ccss: Optional[str] = None
         self.selected_port: Optional[int] = None
+        self._cached_instruments: Optional[Dict[str, Any]] = None
         
         if not self.spotread_path:
             logger.error("ArgyllCMS 'spotread' executable was not found on this system!")
         else:
             logger.info(f"Found spotread: {self.spotread_path}")
             
-        instruments = self.detect_instruments()
+        instruments = self.detect_instruments(force_refresh=True)
         if not instruments["has_hardware"]:
             logger.warning("No physical colorimeter probe detected. Please ensure USB probe is plugged in.")
         else:
@@ -102,15 +103,20 @@ class MeterDriver:
                 
         return None
 
-    def detect_instruments(self) -> Dict[str, Any]:
-        """Detects connected colorimeters via spotread."""
+    def detect_instruments(self, force_refresh: bool = False) -> Dict[str, Any]:
+        """Detects connected colorimeters via spotread, caching results to avoid USB bus collisions."""
+        if not force_refresh and self._cached_instruments is not None:
+            return self._cached_instruments
+
         if not self.spotread_path:
-            return {
+            res = {
                 "spotread_found": False,
                 "has_hardware": False,
                 "instruments": [],
                 "error": "spotread executable not found"
             }
+            self._cached_instruments = res
+            return res
 
         try:
             proc = subprocess.run(
@@ -143,21 +149,25 @@ class MeterDriver:
                             break
             
             has_hw = any(i["is_colorimeter"] for i in instruments)
-            return {
+            res = {
                 "spotread_found": True,
                 "spotread_path": self.spotread_path,
                 "has_hardware": has_hw,
                 "instruments": instruments
             }
+            self._cached_instruments = res
+            return res
         except Exception as e:
             logger.error(f"Failed to detect instruments: {e}")
-            return {
+            res = {
                 "spotread_found": True,
                 "spotread_path": self.spotread_path,
                 "has_hardware": False,
                 "instruments": [],
                 "error": str(e)
             }
+            self._cached_instruments = res
+            return res
 
     def get_available_ccss_files(self) -> List[Dict[str, str]]:
         """Returns list of available CCSS display correction profiles."""
