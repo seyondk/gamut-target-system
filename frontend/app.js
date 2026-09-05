@@ -313,14 +313,6 @@ function applyTranslations() {
         selContainer.options[1].text = currentLang === 'en' ? 'BT.2020 (Recommended/Wide Gamut)' : 'BT.2020 (推荐/广色域)';
     }
 
-    const selPatchSize = document.getElementById('select-patch-size');
-    if (selPatchSize && selPatchSize.options.length >= 4) {
-        selPatchSize.options[0].text = t('patch_size_10');
-        selPatchSize.options[1].text = t('patch_size_20');
-        selPatchSize.options[2].text = t('patch_size_50');
-        selPatchSize.options[3].text = t('patch_size_100');
-    }
-
     updatePatchButtonState();
     renderTargetCanvas();
     updateDocPipDOM();
@@ -1388,108 +1380,313 @@ function setupDocumentPipWindow(pip) {
     doc.body.innerHTML = `
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-            #doc-container {
+            body, html {
+                width: 100%; height: 100%; overflow: hidden; background: #000000;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: #ffffff;
+            }
+            #container {
                 position: relative; width: 100vw; height: 100vh;
                 display: flex; align-items: center; justify-content: center;
-                background-color: #000000; transition: background-color 0.2s;
+                background-color: #000000; transition: background-color 0.2s ease;
             }
-            #doc-patch {
+            #patch {
                 position: absolute; display: flex; align-items: center; justify-content: center;
-                background-color: transparent; opacity: 0; transition: opacity 0.25s, width 0.25s, height 0.25s;
+                background-color: transparent; opacity: 0;
+                transition: opacity 0.25s ease, width 0.25s, height 0.25s, background-color 0.12s;
             }
-            #doc-patch.active-color { opacity: 1; }
+            #patch.active-color { opacity: 1; box-shadow: 0 0 2px rgba(0, 0, 0, 0.8); }
             .patch-10 { width: 31.6vw; height: 31.6vh; }
             .patch-20 { width: 44.7vw; height: 44.7vh; }
             .patch-50 { width: 70.7vw; height: 70.7vh; }
-            .patch-100 { width: 100vw; height: 100vh; }
-            #doc-crosshair {
-                position: absolute; width: 120px; height: 120px;
+            .patch-100 { width: 100vw !important; height: 100vh !important; }
+
+            /* Alignment Target Ring & Crosshairs */
+            #target-crosshair {
+                position: absolute; width: 110px; height: 110px;
                 border: 2px dashed rgba(56, 189, 248, 0.85); border-radius: 50%;
                 pointer-events: none; display: flex; align-items: center; justify-content: center;
-                z-index: 50; box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+                opacity: 0.95; transition: opacity 0.3s ease;
+                box-shadow: 0 0 22px rgba(56, 189, 248, 0.25); z-index: 50;
             }
-            #doc-crosshair::before, #doc-crosshair::after { content: ''; position: absolute; background: rgba(56, 189, 248, 0.85); }
-            #doc-crosshair::before { width: 28px; height: 2px; }
-            #doc-crosshair::after { width: 2px; height: 28px; }
-            .crosshair-dot { width: 4px; height: 4px; background: #38bdf8; border-radius: 50%; }
+            #target-crosshair::before, #target-crosshair::after {
+                content: ''; position: absolute; background: rgba(56, 189, 248, 0.85);
+            }
+            #target-crosshair::before { width: 26px; height: 2px; }
+            #target-crosshair::after { width: 2px; height: 26px; }
+            .crosshair-center-dot {
+                width: 4px; height: 4px; background: #38bdf8; border-radius: 50%;
+                box-shadow: 0 0 6px #38bdf8;
+            }
             .crosshair-label {
                 position: absolute; bottom: -32px; font-size: 11px; font-weight: 500; color: #38bdf8;
-                white-space: nowrap; background: rgba(15, 23, 42, 0.85); padding: 3px 8px;
-                border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.35);
+                letter-spacing: 0.5px; white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+                background: rgba(15, 23, 42, 0.85); padding: 3px 8px; border-radius: 4px;
+                border: 1px solid rgba(56, 189, 248, 0.35);
             }
-            #doc-hud {
-                position: fixed; top: 12px; left: 12px;
-                background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px);
-                border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px;
-                padding: 8px 12px; font-size: 11px; color: #e2e8f0; z-index: 100;
+            .hide-target #target-crosshair { opacity: 0; }
+
+            /* Top-Left Info HUD */
+            #hud {
+                position: fixed; top: 16px; left: 16px;
+                background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px);
+                border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px;
+                padding: 12px 18px; font-size: 13px; color: #e2e8f0; z-index: 100;
+                transition: opacity 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             }
-            #doc-flash {
+            #hud.autohide { opacity: 0; pointer-events: none; }
+            #hud h1 {
+                font-size: 14px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;
+                display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            }
+            .hud-row { display: flex; gap: 16px; margin-top: 3px; }
+            .hud-val { font-family: "SF Mono", Menlo, Monaco, monospace; color: #f8fafc; }
+            .status-dot {
+                display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                background: #10b981; margin-right: 6px;
+            }
+            .hdr-tag {
+                background: rgba(236, 72, 153, 0.2); color: #f472b6;
+                border: 1px solid rgba(236, 72, 153, 0.4); padding: 1px 6px;
+                border-radius: 4px; font-size: 11px; font-weight: 700;
+            }
+            .pinned-tag {
+                background: rgba(56, 189, 248, 0.25); color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.6); padding: 1px 6px;
+                border-radius: 4px; font-size: 11px; font-weight: 700;
+            }
+
+            /* Bottom Toolbar */
+            #toolbar {
+                position: fixed; bottom: 16px; display: flex; gap: 8px;
+                background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
+                padding: 8px 14px; z-index: 100; transition: opacity 0.3s ease;
+            }
+            #toolbar.autohide { opacity: 0; pointer-events: none; }
+            button.tool-btn {
+                background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+                padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;
+                transition: all 0.2s; white-space: nowrap;
+            }
+            button.tool-btn:hover { background: #0284c7; border-color: #38bdf8; }
+
+            /* Flash & Complete Overlay */
+            #flash-overlay {
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                 pointer-events: none; z-index: 9000; opacity: 0;
-                box-shadow: inset 0 0 160px 50px #10b981; transition: opacity 0.2s;
+                box-shadow: inset 0 0 180px 60px #10b981; transition: opacity 0.2s;
             }
-            #doc-toolbar {
-                position: fixed; bottom: 10px; display: flex; gap: 6px;
-                background: rgba(15, 23, 42, 0.85); border-radius: 6px; padding: 6px 10px;
-                border: 1px solid rgba(255, 255, 255, 0.15); z-index: 100;
+            #flash-overlay.flashing {
+                animation: screenFlashPulse 3.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
             }
-            .pip-btn {
-                background: #1e293b; color: #f8fafc; border: 1px solid #334155;
-                padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
+            @keyframes screenFlashPulse {
+                0% { opacity: 0; } 15% { opacity: 1; } 30% { opacity: 0.15; }
+                45% { opacity: 1; } 60% { opacity: 0.2; } 75% { opacity: 1; } 100% { opacity: 0; }
             }
-            .pip-btn:hover { background: #0284c7; border-color: #38bdf8; }
+            #complete-overlay {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                display: flex; align-items: center; justify-content: center;
+                pointer-events: none; opacity: 0; transform: scale(0.95);
+                transition: opacity 0.35s, transform 0.35s; z-index: 10000;
+                background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); cursor: pointer;
+            }
+            #complete-overlay.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+            .complete-card {
+                background: rgba(15, 23, 42, 0.96); border: 2px solid #10b981;
+                border-radius: 16px; padding: 28px 44px; text-align: center;
+                box-shadow: 0 0 60px rgba(16, 185, 129, 0.45);
+            }
         </style>
-        <div id="doc-flash"></div>
-        <div id="doc-container">
-            <div id="doc-patch" class="${patchDisplayOptions.size || 'patch-20'}"></div>
-            <div id="doc-crosshair">
-                <div class="crosshair-dot"></div>
-                <span class="crosshair-label" id="doc-crosshair-lbl">${currentLang === 'en' ? 'Probe Alignment Target' : '探头校色对准框'}</span>
+        <div id="flash-overlay"></div>
+        <div id="complete-overlay" onclick="this.classList.remove('active')">
+            <div class="complete-card">
+                <div style="font-size:32px; color:#10b981; margin-bottom:8px;">✓</div>
+                <div id="complete-title" style="font-size:20px; font-weight:800; color:#f8fafc; margin-bottom:4px;">全套点位测试已完成！</div>
+                <div id="complete-subtitle" style="font-size:12px; color:#38bdf8; font-family:monospace; margin-bottom:6px;">ALL POINTS MEASURED</div>
+                <div id="complete-count" style="font-size:13px; color:#cbd5e1;">全套测试坐标数据已同步生成</div>
+                <div style="margin-top:12px; font-size:11px; color:#64748b;">[ 点击或按任意键退出提醒 ]</div>
             </div>
         </div>
-        <div id="doc-hud">
-            <div style="font-weight:700; color:#38bdf8; margin-bottom:3px;" id="doc-hud-title">${currentLang === 'en' ? 'Target Patch · Always on Top' : '测色靶窗 · 强制置顶'}</div>
-            <div>点位: <strong id="doc-hud-pt">待机定位模式</strong> | RGB: <span id="doc-hud-rgb" style="font-family:monospace;">--</span></div>
+
+        <div id="container">
+            <div id="patch" class="patch-20"></div>
+            <div id="target-crosshair">
+                <div class="crosshair-center-dot"></div>
+                <span class="crosshair-label" id="crosshair-label">探头校色对准框</span>
+            </div>
         </div>
-        <div id="doc-toolbar">
-            <button class="pip-btn" id="doc-btn-size">尺寸 (20%)</button>
-            <button class="pip-btn" id="doc-btn-bg">黑/灰</button>
-            <button class="pip-btn" id="doc-btn-h">准星</button>
+
+        <div id="hud">
+            <h1>
+                <span id="hud-title-text">${currentLang === 'en' ? 'Target Patch (TV HDMI Target)' : '外接电视测色靶窗 (TV HDMI Target)'}</span>
+                <span class="pinned-tag" id="hud-pinned-tag">📌 强制置顶</span>
+                <span class="hdr-tag" id="hud-hdr-tag">${appState.settings?.hdr_mode !== false ? (currentLang === 'en' ? 'HDR Mode' : 'HDR 开启') : (currentLang === 'en' ? 'SDR Mode' : 'SDR 模式')}</span>
+            </h1>
+            <div class="hud-row">
+                <span><span id="lbl-status">${currentLang === 'en' ? 'Status' : '状态'}</span>: <span class="status-dot"></span><span id="ws-text">${currentLang === 'en' ? 'Linked' : '已同步联动'}</span></span>
+                <span><span id="lbl-curr-pt">${currentLang === 'en' ? 'Target Point' : '当前点位'}</span>: <strong id="hud-point" class="hud-val">${currentLang === 'en' ? 'Standby Mode' : '待机定位模式'}</strong></span>
+            </div>
+            <div class="hud-row">
+                <span><span id="lbl-target">${currentLang === 'en' ? 'Target xy' : '需求值'}</span>: <span id="hud-target" class="hud-val">--</span></span>
+                <span><span id="lbl-container">${currentLang === 'en' ? 'Container' : '信号容器'}</span>: <span id="hud-container" class="hud-val" style="color:#38bdf8">${(appState.settings?.container_space || 'BT2020').toUpperCase()}</span></span>
+            </div>
+            <div class="hud-row">
+                <span><span id="lbl-rgb">${currentLang === 'en' ? 'RGB Signal' : 'RGB信号'}</span>: <span id="hud-rgb" class="hud-val">--</span></span>
+                <span><span id="lbl-clipped">${currentLang === 'en' ? 'Gamut Clip' : '裁切状态'}</span>: <span id="hud-clipped" class="hud-val">${currentLang === 'en' ? 'Awaiting Command' : '等待测色指令'}</span></span>
+            </div>
+        </div>
+
+        <div id="toolbar">
+            <button class="tool-btn" id="btn-fs">${currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]'}</button>
+            <button class="tool-btn" id="btn-size"><span id="lbl-btn-size">${currentLang === 'en' ? 'Patch Size' : '靶窗尺寸'}</span> (<span id="btn-size-label">20%</span>) [S]</button>
+            <button class="tool-btn" id="btn-crosshair">${currentLang === 'en' ? 'Crosshair [H]' : '准星开关 [H]'}</button>
+            <button class="tool-btn" id="btn-bg">${currentLang === 'en' ? 'Bg Black/Gray [B]' : '背景黑/灰 [B]'}</button>
+            <button class="tool-btn" id="btn-reset">${currentLang === 'en' ? 'Standby [C]' : '复位待机 [C]'}</button>
         </div>
     `;
 
-    const btnSize = doc.getElementById('doc-btn-size');
-    if (btnSize) {
-        btnSize.onclick = () => {
-            const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
-            const curIdx = sizes.indexOf(patchDisplayOptions.size || 'patch-20');
-            const nextSize = sizes[(curIdx + 1) % sizes.length];
-            changePatchSize(nextSize);
-            const sel = document.getElementById('select-patch-size');
-            if (sel) sel.value = nextSize;
-            btnSize.innerText = `尺寸 (${nextSize.replace('patch-', '')}%)`;
-        };
+    // 1. Auto-hide HUD and Toolbar after idle (3.5s)
+    const hud = doc.getElementById('hud');
+    const toolbar = doc.getElementById('toolbar');
+    let hideTimer = null;
+    function resetHideTimer() {
+        if (hud) hud.classList.remove('autohide');
+        if (toolbar) toolbar.classList.remove('autohide');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            if (hud) hud.classList.add('autohide');
+            if (toolbar) toolbar.classList.add('autohide');
+        }, 3500);
+    }
+    doc.addEventListener('mousemove', resetHideTimer);
+    resetHideTimer();
+
+    // 2. Fullscreen / Window Maximization
+    let isMaximized = false;
+    let origBounds = {
+        x: pip.screenX || 100,
+        y: pip.screenY || 100,
+        w: pip.outerWidth || 640,
+        h: pip.outerHeight || 640
+    };
+
+    function toggleFullscreen() {
+        const btnFs = doc.getElementById('btn-fs');
+        if (!isMaximized) {
+            origBounds = {
+                x: pip.screenX || 100,
+                y: pip.screenY || 100,
+                w: pip.outerWidth || 640,
+                h: pip.outerHeight || 640
+            };
+            isMaximized = true;
+
+            // Attempt browser standard requestFullscreen
+            if (doc.documentElement.requestFullscreen) {
+                doc.documentElement.requestFullscreen().catch(() => {});
+            }
+
+            // Maximize PiP window to fill monitor display area
+            try {
+                const s = pip.screen;
+                const targetX = s.availLeft !== undefined ? s.availLeft : (s.left || 0);
+                const targetY = s.availTop !== undefined ? s.availTop : (s.top || 0);
+                const targetW = s.availWidth || s.width;
+                const targetH = s.availHeight || s.height;
+                pip.moveTo(targetX, targetY);
+                pip.resizeTo(targetW, targetH);
+            } catch (e) {
+                console.warn("Maximize PiP window note:", e);
+            }
+
+            if (btnFs) btnFs.innerText = currentLang === 'en' ? 'Exit Fullscreen [F]' : '退出全屏 [F]';
+        } else {
+            isMaximized = false;
+            if (doc.fullscreenElement && doc.exitFullscreen) {
+                doc.exitFullscreen().catch(() => {});
+            }
+            try {
+                pip.moveTo(origBounds.x, origBounds.y);
+                pip.resizeTo(origBounds.w, origBounds.h);
+            } catch (e) {
+                console.warn("Restore PiP window note:", e);
+            }
+            if (btnFs) btnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
+        }
     }
 
-    const btnBg = doc.getElementById('doc-btn-bg');
-    if (btnBg) {
-        btnBg.onclick = () => {
-            patchDisplayOptions.bg = patchDisplayOptions.bg === '#000000' ? '#2e2e2e' : '#000000';
-            const cont = doc.getElementById('doc-container');
-            if (cont) cont.style.backgroundColor = patchDisplayOptions.bg;
-            renderTargetCanvas();
+    // 3. Cycle Patch Size (10% -> 20% -> 50% -> 100% Fullscreen)
+    function cycleSize() {
+        const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+        const sizeLabels = {
+            'patch-10': '10%',
+            'patch-20': '20%',
+            'patch-50': '50%',
+            'patch-100': currentLang === 'en' ? '100%' : '全屏'
         };
+        const curIdx = sizes.indexOf(patchDisplayOptions.size || 'patch-20');
+        const nextSize = sizes[(curIdx + 1) % sizes.length];
+        patchDisplayOptions.size = nextSize;
+        updateTargetPatchDisplay(currentTargetPatch);
+        const lbl = doc.getElementById('btn-size-label');
+        if (lbl) lbl.innerText = sizeLabels[nextSize];
     }
 
-    const btnH = doc.getElementById('doc-btn-h');
-    if (btnH) {
-        btnH.onclick = () => {
-            patchDisplayOptions.crosshair = !patchDisplayOptions.crosshair;
-            const ch = doc.getElementById('doc-crosshair');
-            if (ch) ch.style.display = patchDisplayOptions.crosshair ? 'flex' : 'none';
-            renderTargetCanvas();
-        };
+    // 4. Toggle Alignment Crosshair
+    function toggleCrosshair() {
+        doc.body.classList.toggle('hide-target');
+        patchDisplayOptions.crosshair = !doc.body.classList.contains('hide-target');
+        renderTargetCanvas();
     }
+
+    // 5. Toggle Background (Pure Black / 18% Gray)
+    function toggleBackground() {
+        patchDisplayOptions.bg = patchDisplayOptions.bg === '#000000' ? '#2e2e2e' : '#000000';
+        const cont = doc.getElementById('container');
+        if (cont) cont.style.backgroundColor = patchDisplayOptions.bg;
+        renderTargetCanvas();
+    }
+
+    // 6. Reset to Standby Mode
+    function setStandbyMode() {
+        updateTargetPatchDisplay(null, true);
+    }
+
+    // Hook up button clicks
+    const btnFs = doc.getElementById('btn-fs');
+    if (btnFs) btnFs.onclick = toggleFullscreen;
+
+    const btnSize = doc.getElementById('btn-size');
+    if (btnSize) btnSize.onclick = cycleSize;
+
+    const btnCrosshair = doc.getElementById('btn-crosshair');
+    if (btnCrosshair) btnCrosshair.onclick = toggleCrosshair;
+
+    const btnBg = doc.getElementById('btn-bg');
+    if (btnBg) btnBg.onclick = toggleBackground;
+
+    const btnReset = doc.getElementById('btn-reset');
+    if (btnReset) btnReset.onclick = setStandbyMode;
+
+    // Double-click on background toggles fullscreen
+    const container = doc.getElementById('container');
+    if (container) container.ondblclick = toggleFullscreen;
+
+    // Keyboard Shortcuts inside PiP window
+    pip.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        if (k === 'f') toggleFullscreen();
+        else if (k === 's') cycleSize();
+        else if (k === 'h') toggleCrosshair();
+        else if (k === 'b') toggleBackground();
+        else if (k === 'c') setStandbyMode();
+        else if (k === 'escape') {
+            const overlay = doc.getElementById('complete-overlay');
+            if (overlay) overlay.classList.remove('active');
+            if (isMaximized) toggleFullscreen();
+        }
+    });
 
     pip.addEventListener('pagehide', () => {
         activeDocPipWindow = null;
@@ -1502,16 +1699,30 @@ function setupDocumentPipWindow(pip) {
 function updateDocPipDOM() {
     if (!activeDocPipWindow || !activeDocPipWindow.document) return;
     const doc = activeDocPipWindow.document;
-    const patchEl = doc.getElementById('doc-patch');
-    const hudPt = doc.getElementById('doc-hud-pt');
-    const hudRgb = doc.getElementById('doc-hud-rgb');
-    const chLabel = doc.getElementById('doc-crosshair-lbl');
-    const container = doc.getElementById('doc-container');
+    const patchEl = doc.getElementById('patch');
+    const hudPoint = doc.getElementById('hud-point');
+    const hudTarget = doc.getElementById('hud-target');
+    const hudContainer = doc.getElementById('hud-container');
+    const hudHdr = doc.getElementById('hud-hdr-tag');
+    const hudRgb = doc.getElementById('hud-rgb');
+    const hudClipped = doc.getElementById('hud-clipped');
+    const chLabel = doc.getElementById('crosshair-label');
+    const container = doc.getElementById('container');
+    const btnSizeLabel = doc.getElementById('btn-size-label');
+
     if (!patchEl) return;
 
+    // Apply size class
     const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+    const sizeLabels = {
+        'patch-10': '10%',
+        'patch-20': '20%',
+        'patch-50': '50%',
+        'patch-100': currentLang === 'en' ? '100%' : '全屏'
+    };
     sizes.forEach(s => patchEl.classList.remove(s));
     patchEl.classList.add(patchDisplayOptions.size || 'patch-20');
+    if (btnSizeLabel) btnSizeLabel.innerText = sizeLabels[patchDisplayOptions.size || 'patch-20'];
 
     if (container) container.style.backgroundColor = patchDisplayOptions.bg || '#000000';
 
@@ -1519,8 +1730,13 @@ function updateDocPipDOM() {
     if (!p || p.is_standby) {
         patchEl.classList.remove('active-color');
         patchEl.style.backgroundColor = 'transparent';
-        if (hudPt) hudPt.innerText = currentLang === 'en' ? 'Standby (Align Probe)' : '待机定位 (探头对准中央)';
+        if (hudPoint) hudPoint.innerText = currentLang === 'en' ? 'Standby Mode' : '待机定位模式';
+        if (hudTarget) hudTarget.innerText = '--';
         if (hudRgb) hudRgb.innerText = '--';
+        if (hudClipped) {
+            hudClipped.innerText = currentLang === 'en' ? 'Awaiting Command' : '等待测色指令';
+            hudClipped.style.color = '#94a3b8';
+        }
         if (chLabel) chLabel.innerText = currentLang === 'en' ? 'Probe Alignment Target' : '探头校色对准框';
     } else {
         patchEl.classList.add('active-color');
@@ -1538,8 +1754,27 @@ function updateDocPipDOM() {
             patchEl.style.backgroundColor = `rgb(${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)})`;
         }
 
-        if (hudPt) hudPt.innerText = `${p.name || ('P' + p.point_id)} (${(p.target_x||0).toFixed(4)}, ${(p.target_y||0).toFixed(4)})`;
+        if (hudPoint) hudPoint.innerText = `${p.name || ('P' + p.point_id)} (P${p.point_id})`;
+        if (hudTarget) hudTarget.innerText = `x: ${(p.target_x||0).toFixed(4)}, y: ${(p.target_y||0).toFixed(4)}`;
+        if (hudContainer) {
+            hudContainer.innerText = p.container === 'native' ? (currentLang === 'en' ? 'Native Passthrough' : 'Native 原生直通') : (p.container || 'BT2020').toUpperCase();
+        }
+        if (hudHdr) {
+            hudHdr.innerText = p.hdr_mode !== false ? (currentLang === 'en' ? 'HDR Mode' : 'HDR 开启') : (currentLang === 'en' ? 'SDR Mode' : 'SDR 模式');
+        }
         if (hudRgb) hudRgb.innerText = `${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)}`;
+        if (hudClipped) {
+            if (p.container === 'native') {
+                hudClipped.innerText = currentLang === 'en' ? 'Native Passthrough (Unclipped)' : '原生极限 (无裁切限制)';
+                hudClipped.style.color = '#10b981';
+            } else if (p.is_clipped) {
+                hudClipped.innerText = currentLang === 'en' ? 'Clipped / Out of Gamut' : '已溢出截断';
+                hudClipped.style.color = '#ef4444';
+            } else {
+                hudClipped.innerText = currentLang === 'en' ? 'Accurately Mapped' : '精准映射';
+                hudClipped.style.color = '#10b981';
+            }
+        }
         if (chLabel) chLabel.innerText = `${p.name || ('P' + p.point_id)}`;
     }
 }
@@ -1561,12 +1796,23 @@ function triggerPatchCompletion(title, sub, desc) {
     patchDisplayOptions.completeBanner = { title, sub, desc };
     updateTargetPatchDisplay(null, true);
 
+    // Also flash & show overlay in Document PiP window
     if (activeDocPipWindow && activeDocPipWindow.document) {
-        const flash = activeDocPipWindow.document.getElementById('doc-flash');
+        const doc = activeDocPipWindow.document;
+        const flash = doc.getElementById('flash-overlay');
         if (flash) {
-            flash.style.opacity = '1';
-            setTimeout(() => { if (flash) flash.style.opacity = '0'; }, 2200);
+            flash.classList.remove('flashing');
+            void flash.offsetWidth;
+            flash.classList.add('flashing');
         }
+        const overlay = doc.getElementById('complete-overlay');
+        const tTitle = doc.getElementById('complete-title');
+        const tSub = doc.getElementById('complete-subtitle');
+        const tDesc = doc.getElementById('complete-count');
+        if (tTitle && title) tTitle.innerText = title;
+        if (tSub && sub) tSub.innerText = sub;
+        if (tDesc && desc) tDesc.innerText = desc;
+        if (overlay) overlay.classList.add('active');
     }
 
     renderTargetCanvas();
@@ -1576,6 +1822,13 @@ function triggerPatchCompletion(title, sub, desc) {
         patchDisplayOptions.flashActive = false;
         patchDisplayOptions.completeBanner = null;
         renderTargetCanvas();
+        if (activeDocPipWindow && activeDocPipWindow.document) {
+            const doc = activeDocPipWindow.document;
+            const overlay = doc.getElementById('complete-overlay');
+            if (overlay) overlay.classList.remove('active');
+            const flash = doc.getElementById('flash-overlay');
+            if (flash) flash.classList.remove('flashing');
+        }
     }, 4500);
 }
 
@@ -1596,10 +1849,11 @@ async function toggleTVPatchWindow() {
     // 2. Strategy 1: Document Picture-in-Picture (Chromium 116+)
     if ('documentPictureInPicture' in window) {
         try {
+            // disallowReturnToOpener: true hides the "Back to tab" button, leaving only the Close button
             const pip = await window.documentPictureInPicture.requestWindow({
-                width: 560,
-                height: 560,
-                disallowReturnToOpener: false
+                width: 640,
+                height: 640,
+                disallowReturnToOpener: true
             });
             activeDocPipWindow = pip;
             setupDocumentPipWindow(pip);

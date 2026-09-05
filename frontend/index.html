@@ -784,12 +784,6 @@
                 </svg>
                 <span data-i18n="tv_window_btn" id="lbl-open-patch">打开测色靶窗</span>
             </button>
-            <select id="select-patch-size" onchange="changePatchSize(this.value)" title="测色靶窗显示面积尺寸" style="height:32px;">
-                <option value="patch-10" data-i18n="patch_size_10">靶窗: 10% 面积</option>
-                <option value="patch-20" selected data-i18n="patch_size_20">靶窗: 20% (标准)</option>
-                <option value="patch-50" data-i18n="patch_size_50">靶窗: 50% 面积</option>
-                <option value="patch-100" data-i18n="patch_size_100">靶窗: 100% 铺满</option>
-            </select>
 
             <!-- Export Actions -->
             <button class="btn" onclick="exportCSV()" title="导出完整测试数据为 Excel/CSV" data-i18n="export_csv_btn">
@@ -1106,7 +1100,7 @@
     <video id="patch-pip-video" playsinline muted autoplay style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;z-index:-1000;"></video>
 
     <!-- Dependencies -->
-    <script src="/static/cie1931.js?v=9"></script>
-    <script src="/static/app.js?v=9"></script>
+    <script src="/static/cie1931.js?v=10"></script>
+    <script src="/static/app.js?v=10"></script>
 </body>
 </html>
