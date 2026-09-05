@@ -39,8 +39,9 @@
   - 自动计算 CIE 1976 UCS 感知均匀色度差 $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$。
   - 自动对实测色偏 $\Delta xy > 0.006$ 的点位进行醒目高亮警示。
 - **外接电视专用独立测色靶窗 (`/patch`) 与 强制置顶功能 (Always on Top)**：
-  - **单键唤起系统级强制置顶 (Always on Top / 画中画)**：主控制台提供统一单键 **`[打开测色靶窗]`**，点击即刻以操作系统最高层级原生置顶悬浮窗运行（始终悬浮于所有桌面软件与窗口之上，绝不下沉被遮挡）。
-  - **双引擎通用置顶技术架构 (Safari / Chrome / Edge 通用)**：集成标准视频画中画（Video Canvas PiP，与视频网站完全一致的原生置顶机制，全浏览器兼容）与 Chromium Document PiP，在 macOS Safari 与 Chrome 下均可实现 100% 稳定的“一直置顶”；控制台配备专属靶窗尺寸快捷切换（10%、20%、50%、100%）。
+  - **默认系统级原生置顶 (Always on Top / 画中画)**：主控制台提供统一单键 **`[打开测色靶窗]`**，点击即刻默认以操作系统最高层级原生置顶悬浮窗开启（Chrome Document PiP / Video Canvas PiP 双引擎，在 macOS Safari 与 Chrome 下均可实现 100% 稳定置顶，始终悬浮于所有桌面软件与窗口之上，绝不下沉被遮挡）。
+  - **全屏与置顶小窗即时无痕切换**：置顶小窗内点击 `[全屏切换 [F]]` 即刻无缝升至全屏靶窗；全屏下按 `[ESC]`、`[F]` 快捷键或点击关闭时，**全屏视口立即彻底关闭并瞬时交还置顶小窗**，无任何残留背景窗口或多余提示遮罩。
+  - **探头暗场/黑场自适应长曝光积分**：底层驱动针对 OLED/Mini-LED 纯黑场及极限暗光采样（传感器多帧低信噪比积分场景）自动启用最高 30 秒自适应等待机制，杜绝暗场测量因超时中断。
   - **防息屏保持 (Screen Wake Lock)**：置顶运行期间自动启用屏幕唤醒锁，防止测试过程中电视或显示器意外息屏休眠。
   - **全黑防灼屏待机模式**：初始无色彩方块输出，仅显示中央定位准星，防止长时间静止高亮图像导致 OLED 灼屏。
   - **完整键盘快捷键体系**：
@@ -50,7 +51,7 @@
     - `[H]`：开启 / 关闭中央准星定位标框
     - `[B]`：切换纯黑 / 18% 灰背景底色
     - `[C]`：一键复位为全黑待机定位模式
-    - `[ESC]`：关闭测试完成通知横幅 / 退出置顶
+    - `[ESC]`：关闭测试完成通知横幅 / 退出全屏返回置顶
   - **自动测色完成视听提醒**：整轮点位或验证测试完成后，靶窗触发屏幕四周绿色脉冲呼吸闪烁与上升琶音音效提醒。
 - **探头与出厂校色基准验证 (Validation) 及 型号直观识别**：
   - 自动检测并精准显示物理探头硬件真实型号（如 `X-Rite i1 DisplayPro` / `Calibrite Display Plus HL`），配备状态圆点指示。
@@ -132,8 +133,9 @@ The system communicates directly with hardware colorimeters (**Calibrite / X-Rit
   - Calculates CIE 1976 UCS distance: $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$.
   - Highlights test points in warning red whenever $\Delta xy > 0.006$.
 - **Dedicated External TV Target Window (`/patch`) with Always-on-Top (PiP)**:
-  - **Single-Button Launch with True Always-on-Top**: Unified single header button **`[Open Target Patch]`** immediately pops up an OS-level always-on-top floating window above all desktop applications, ensuring it never drops behind the console.
-  - **Dual-Engine Universal PiP (Safari / Chrome / Edge Universal)**: Integrates standard Video Canvas Picture-in-Picture (identical to native video site PiP mechanisms, universally compatible across macOS Safari & Chrome) and Chromium Document PiP, with live canvas streaming and patch size presets (10%, 20%, 50%, 100%).
+  - **Default System-Level Always-on-Top**: Unified single header button **`[Open Target Patch]`** immediately pops up an OS-level always-on-top floating window by default (Dual-Engine: Chrome Document PiP / Video Canvas PiP, universally stable across macOS Safari & Chrome), guaranteeing it never drops behind background windows.
+  - **Seamless Fullscreen-to-PiP Transition**: One-click fullscreen escalation via `[Fullscreen [F]]`; exiting fullscreen via `[ESC]`, `[F]`, or the on-screen exit button **instantly closes the fullscreen viewport completely and cleanly returns focus to the pinned patch window**, eliminating ghost background cards or residual prompts.
+  - **Adaptive Low-Luminance / Black Integration**: Low-level ArgyllCMS probe driver features up to 30-second adaptive integration for OLED/Mini-LED near-zero black levels and low SNR points, preventing measurement timeout aborts during deep multi-frame optical averaging.
   - **Screen Wake Lock**: Automatically maintains display wakefulness during calibration to prevent unexpected screen dimming or sleep.
   - **Pure-Black Standby Mode**: Default zero-luminance background with high-visibility center crosshair and alignment ring, preventing OLED panel burn-in.
   - **Keyboard Shortcut System**:
@@ -143,7 +145,7 @@ The system communicates directly with hardware colorimeters (**Calibrite / X-Rit
     - `[H]`: Toggle center crosshair alignment ring
     - `[B]`: Toggle black / 18% gray background
     - `[C]`: One-key reset to black standby alignment mode
-    - `[ESC]`: Dismiss completion overlay / Exit pinned window
+    - `[ESC]`: Dismiss completion overlay / Exit fullscreen back to pinned mode
   - **Completion Audiovisual Alert**: Automatic border pulse flash and ascending chime upon finishing batch testing or validation.
 - **Colorimeter Hardware Model Recognition & Factory Validation**:
   - Automatic detection and explicit display of physical hardware model (e.g. `X-Rite i1 DisplayPro` / `Calibrite Display Plus HL`) with live connection dot.
