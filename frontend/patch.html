@@ -777,13 +777,6 @@
                 document.documentElement.requestFullscreen().catch(e => console.warn("Fullscreen request warning:", e));
             } else {
                 document.exitFullscreen().catch(e => console.warn("Exit fullscreen warning:", e));
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('from') === 'pip') {
-                    if (window.opener && typeof window.opener.toggleTVPatchWindow === 'function') {
-                        window.opener.toggleTVPatchWindow();
-                        window.close();
-                    }
-                }
             }
         }
 
@@ -796,13 +789,6 @@
                 if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Switch to Small Window [F]' : '切换回小窗 [F]';
             } else {
                 if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('from') === 'pip') {
-                    if (window.opener && typeof window.opener.toggleTVPatchWindow === 'function') {
-                        window.opener.toggleTVPatchWindow();
-                        window.close();
-                    }
-                }
             }
         });
 
@@ -1118,12 +1104,7 @@
         // Keyboard Shortcuts
         function handleKeydown(e) {
             const key = e.key.toLowerCase();
-            if (key === 't') switchToPipWindow();
-            else if (key === 'f') {
-                const ov = document.getElementById('fs-entry-overlay');
-                if (ov) ov.style.display = 'none';
-                toggleFullscreen();
-            }
+            if (key === 'f') toggleFullscreen();
             else if (key === 's') cycleSize();
             else if (key === 'h') toggleCrosshair();
             else if (key === 'b') toggleBackground();
@@ -1132,8 +1113,6 @@
                 dismissCompletionOverlay();
                 if (document.fullscreenElement) {
                     document.exitFullscreen().catch(() => {});
-                } else if (pipWindow) {
-                    togglePinTop();
                 }
             }
         }
