@@ -51,7 +51,11 @@ class CIE1931Chart {
 
     setLanguage(lang) {
         this.lang = lang || 'zh';
-        this.draw();
+        this.render();
+    }
+
+    draw() {
+        this.render();
     }
 
     initSpectrumCanvas() {

@@ -274,16 +274,24 @@ function applyTranslations() {
     // Update meter status
     updateMeterDisplay();
 
-    // Update chart language
-    if (chart && chart.setLanguage) {
-        chart.setLanguage(currentLang);
+    // Update chart language safely
+    try {
+        if (chart && chart.setLanguage) {
+            chart.setLanguage(currentLang);
+        }
+    } catch (e) {
+        console.warn("Chart setLanguage warning:", e);
     }
 
     // Re-render table and stats with new language
-    renderTable();
-    updateStats();
-    if (appState.validation_primaries) {
-        renderValidationUI(appState.validation_primaries, appState.validation_summary);
+    try {
+        renderTable();
+        updateStats();
+        if (appState.validation_primaries) {
+            renderValidationUI(appState.validation_primaries, appState.validation_summary);
+        }
+    } catch (e) {
+        console.warn("applyTranslations render error:", e);
     }
 }
 
@@ -309,9 +317,24 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.error("CIE1931Chart initialization failed:", e);
     }
 
-    applyTranslations();
-    await loadInitialState();
-    connectWebSocket();
+    // Connect WebSocket and fetch state immediately
+    try {
+        connectWebSocket();
+    } catch (e) {
+        console.error("WebSocket connection error:", e);
+    }
+
+    try {
+        await loadInitialState();
+    } catch (e) {
+        console.error("loadInitialState error:", e);
+    }
+
+    try {
+        applyTranslations();
+    } catch (e) {
+        console.error("applyTranslations error:", e);
+    }
 });
 
 function connectWebSocket() {
