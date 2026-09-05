@@ -1583,6 +1583,8 @@ function setupDocumentPipWindow(pip) {
         try {
             pip.close();
         } catch (e) {}
+        activeDocPipWindow = null;
+        updatePatchButtonState(false);
     }
 
     // 3. Cycle Patch Size (10% -> 20% -> 50% -> 100% Fullscreen)
@@ -1864,6 +1866,10 @@ async function toggleTVPatchWindow() {
 
 // Backward compatibility alias so any legacy calls work seamlessly
 function openTVPatchWindow() {
+    if (activeDocPipWindow) {
+        try { activeDocPipWindow.close(); } catch (e) {}
+        activeDocPipWindow = null;
+    }
     toggleTVPatchWindow();
 }
 

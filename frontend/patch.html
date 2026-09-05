@@ -729,151 +729,28 @@
             setSize(sizes[nextIdx]);
         }
 
-        function restoreElementsFromPip() {
-            const overlay = document.getElementById('complete-overlay');
-            document.body.appendChild(container);
-            if (overlay) document.body.appendChild(overlay);
-            document.body.appendChild(hud);
-            document.body.appendChild(toolbar);
-        }
-
-        let isTransitioningToFullscreen = false;
-
-        function setupPipWindow(pip) {
-            pipWindow = pip;
-            isTransitioningToFullscreen = false;
-            const dict = getDict();
-
-            // Copy stylesheets and inline styles to PiP window
-            document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
-                pip.document.head.appendChild(el.cloneNode(true));
-            });
-
-            pip.document.title = `${dict.page_title} - ${dict.hud_pinned}`;
-            pip.document.body.style.margin = '0';
-            pip.document.body.style.padding = '0';
-            pip.document.body.style.background = '#000000';
-            pip.document.body.style.overflow = 'hidden';
-            pip.document.body.style.width = '100vw';
-            pip.document.body.style.height = '100vh';
-
-            // Move container, hud, toolbar, and complete-overlay into PiP window
-            pip.document.body.appendChild(container);
-            pip.document.body.appendChild(hud);
-            pip.document.body.appendChild(toolbar);
-            const overlay = document.getElementById('complete-overlay');
-            if (overlay) pip.document.body.appendChild(overlay);
-
-            // Forward keydown, mousemove, and dblclick shortcuts from PiP window
-            pip.addEventListener('keydown', handleKeydown);
-            pip.addEventListener('mousemove', resetHideTimer);
-            pip.addEventListener('dblclick', toggleFullscreen);
-
-            // In PiP window, the button is "全屏切换 [F]"
-            const lblBtnFs = pip.document.getElementById('lbl-btn-fs');
-            if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
-
-            requestScreenWakeLock();
-            updatePinUI(true);
-
-            // Immediately shrink background window and yield focus so it is not visible or blocking
-            try {
-                window.resizeTo(100, 100);
-                window.moveTo(-2000, -2000);
-            } catch (e) {}
-            try {
-                if (window.opener && !window.opener.closed) {
-                    window.opener.focus();
-                } else {
-                    window.blur();
-                }
-            } catch (e) {}
-
-            // When PiP window is closed:
-            pip.addEventListener('pagehide', () => {
-                pipWindow = null;
-                updatePinUI(false);
-                releaseScreenWakeLock();
-                if (isTransitioningToFullscreen) {
-                    // Restoring to fullscreen -> restore elements
-                    restoreElementsFromPip();
-                } else {
-                    // User closed the PiP window directly (clicked X) -> close the parent window completely!
-                    try {
-                        window.close();
-                    } catch (e) {}
-                }
-            });
-        }
-
         async function toggleFullscreen() {
-            if (pipWindow) {
-                // Currently in PiP (small window) mode -> User wants to go FULLSCREEN!
-                isTransitioningToFullscreen = true;
-                // Restore window geometry before fullscreen
-                try {
-                    const s = window.screen;
-                    const w = s ? (s.availWidth || 1920) : 1920;
-                    const h = s ? (s.availHeight || 1080) : 1080;
-                    const x = s ? (s.availLeft !== undefined ? s.availLeft : 0) : 0;
-                    const y = s ? (s.availTop !== undefined ? s.availTop : 0) : 0;
-                    window.moveTo(x, y);
-                    window.resizeTo(w, h);
-                } catch (e) {}
-
-                try { pipWindow.close(); } catch (e) {}
-                pipWindow = null;
-                restoreElementsFromPip();
-                updatePinUI(false);
-                window.focus();
-                try {
-                    await document.documentElement.requestFullscreen();
-                } catch (e) {
-                    console.warn("Fullscreen request warning:", e);
-                }
-            } else if (!document.fullscreenElement) {
-                // Not in PiP, not in fullscreen -> Enter fullscreen
+            if (!document.fullscreenElement) {
                 try {
                     await document.documentElement.requestFullscreen();
                 } catch (e) {
                     console.warn("Fullscreen request warning:", e);
                 }
             } else {
-                // Exiting fullscreen -> Exit fullscreen and automatically enter Always-on-Top (置顶) PiP window!
-                // CRITICAL: Call requestWindow IMMEDIATELY in the user gesture before any await,
-                // otherwise transient user activation expires and Chrome blocks the window!
-                let pipPromise = null;
-                if ('documentPictureInPicture' in window) {
+                // Currently in fullscreen: User clicks to exit -> Reopen PiP on main window and directly close this window!
+                if (window.opener && !window.opener.closed && typeof window.opener.openTVPatchWindow === 'function') {
                     try {
-                        pipPromise = window.documentPictureInPicture.requestWindow({
-                            width: 640,
-                            height: 640,
-                            disallowReturnToOpener: true
-                        });
+                        window.opener.openTVPatchWindow();
                     } catch (e) {
-                        console.warn("Sync PiP request failed:", e);
+                        console.warn("Opener openTVPatchWindow error:", e);
                     }
                 }
-
-                // Concurrently exit fullscreen
                 try {
-                    await document.exitFullscreen();
-                } catch (e) {
-                    console.warn("Exit fullscreen warning:", e);
-                }
-
-                if (pipPromise) {
-                    try {
-                        const pip = await pipPromise;
-                        setupPipWindow(pip);
-                        return;
-                    } catch (err) {
-                        console.warn("PiP resolution failed, falling back:", err);
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen().catch(() => {});
                     }
-                }
-
-                // Fallback if Document PiP was rejected or unavailable
-                await togglePinTop();
+                } catch (e) {}
+                window.close();
             }
         }
 
@@ -883,13 +760,9 @@
             const lblBtnFs = document.getElementById('lbl-btn-fs');
 
             if (isFs) {
-                if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Switch to Small Window [F]' : '切换回小窗 [F]';
+                if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Exit to Small Window [ESC / F]' : '切换回小窗 [ESC / F]';
             } else {
                 if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
-                // If exiting fullscreen unexpectedly outside of toggleFullscreen, try entering PiP if gesture active
-                if (!pipWindow && !isSoftwarePinned && navigator.userActivation && navigator.userActivation.isActive) {
-                    togglePinTop().catch(() => {});
-                }
             }
         });
 
