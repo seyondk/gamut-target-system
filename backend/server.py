@@ -391,6 +391,7 @@ async def measure_black():
         state.is_measuring = False
 
 
+@app.post("/api/measure/{point_id}")
 @app.post("/api/measure/point/{point_id}")
 async def measure_point(point_id: int):
     target = None
@@ -419,7 +420,7 @@ async def measure_point(point_id: int):
             "point": target,
             "points": state.points
         })
-        return {"status": "ok", "point": target}
+        return {"status": "ok", "point": target, "points": state.points}
     except Exception as e:
         await manager.broadcast({"type": "MEASURE_ERROR", "error": str(e)})
         raise HTTPException(status_code=500, detail=str(e))

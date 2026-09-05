@@ -299,15 +299,18 @@ async function loadInitialState() {
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    chart = new CIE1931Chart('cie-canvas');
-
-    window.onChartPointSelected = (pointId) => {
-        selectPoint(pointId);
-    };
+window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        chart = new CIE1931Chart('cie-canvas');
+        window.onChartPointSelected = (pointId) => {
+            selectPoint(pointId);
+        };
+    } catch (e) {
+        console.error("CIE1931Chart initialization failed:", e);
+    }
 
     applyTranslations();
-    loadInitialState();
+    await loadInitialState();
     connectWebSocket();
 });
 
@@ -640,26 +643,33 @@ function renderTable() {
 }
 
 function updateStats() {
-    const tested = appState.points.filter(p => p.has_measured);
+    const points = appState.points || [];
+    const tested = points.filter(p => p.has_measured);
     const exceeded = tested.filter(p => p.pass_status === 'EXCEEDED_P3');
 
-    document.getElementById('stat-tested-count').innerText = `${tested.length} / ${appState.points.length}`;
-    document.getElementById('stat-exceeded-p3').innerText = `${exceeded.length} / ${appState.points.length}`;
+    const elTested = document.getElementById('stat-tested-count');
+    if (elTested) elTested.innerText = `${tested.length} / ${points.length}`;
+
+    const elExceeded = document.getElementById('stat-exceeded-count') || document.getElementById('stat-exceeded-p3');
+    if (elExceeded) elExceeded.innerText = `${exceeded.length} / ${points.length}`;
+
+    const elAvgDxy = document.getElementById('stat-avg-dxy');
+    const elAvgDuv = document.getElementById('stat-avg-duv');
 
     if (tested.length > 0) {
-        const sumDxy = tested.reduce((acc, p) => acc + p.delta_xy, 0);
-        document.getElementById('stat-avg-dxy').innerText = (sumDxy / tested.length).toFixed(4);
+        const sumDxy = tested.reduce((acc, p) => acc + (p.delta_xy || 0), 0);
+        if (elAvgDxy) elAvgDxy.innerText = (sumDxy / tested.length).toFixed(4);
 
-        const testedWithDuv = tested.filter(p => p.delta_uv !== null);
+        const testedWithDuv = tested.filter(p => p.delta_uv !== null && p.delta_uv !== undefined);
         if (testedWithDuv.length > 0) {
             const sumDuv = testedWithDuv.reduce((acc, p) => acc + p.delta_uv, 0);
-            document.getElementById('stat-avg-duv').innerText = (sumDuv / testedWithDuv.length).toFixed(4);
+            if (elAvgDuv) elAvgDuv.innerText = (sumDuv / testedWithDuv.length).toFixed(4);
         } else {
-            document.getElementById('stat-avg-duv').innerText = '--';
+            if (elAvgDuv) elAvgDuv.innerText = '--';
         }
     } else {
-        document.getElementById('stat-avg-dxy').innerText = '--';
-        document.getElementById('stat-avg-duv').innerText = '--';
+        if (elAvgDxy) elAvgDxy.innerText = '--';
+        if (elAvgDuv) elAvgDuv.innerText = '--';
     }
 }
 
@@ -683,7 +693,23 @@ async function displayOnTV(pointId) {
 
 async function measureSingle(pointId) {
     try {
-        await fetch(`/api/measure/${pointId}`, { method: 'POST' });
+        const resp = await fetch(`/api/measure/point/${pointId}`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            alert(currentLang === 'en' ? ("Measurement failed: " + (err.detail || "error")) : ("测量失败: " + (err.detail || "异常")));
+        } else {
+            const data = await resp.json();
+            if (data.point) {
+                const idx = appState.points.findIndex(p => p.id === data.point.id);
+                if (idx !== -1) appState.points[idx] = data.point;
+            }
+            if (data.points) {
+                appState.points = data.points;
+            }
+            renderTable();
+            if (chart && chart.setPoints) chart.setPoints(appState.points);
+            updateStats();
+        }
     } catch (e) {
         alert(currentLang === 'en' ? ("Measurement failed: " + e.message) : ("测量失败: " + e.message));
     }
@@ -697,19 +723,33 @@ async function measureSelectedPoint() {
 
 async function measureBlack() {
     const btn = document.getElementById('btn-measure-black');
-    btn.disabled = true;
-    btn.innerText = currentLang === 'en' ? 'Measuring Black Level...' : '正在测定黑场...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = currentLang === 'en' ? 'Measuring Black Level...' : '正在测定黑场...';
+    }
     try {
         const resp = await fetch('/api/measure/black', { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
             alert(currentLang === 'en' ? ("Black measurement error: " + (err.detail || "failed")) : ("【黑场测量异常】\n" + (err.detail || "读取失败")));
+        } else {
+            const data = await resp.json();
+            if (data.black_baseline) {
+                appState.black_baseline = data.black_baseline;
+                if (data.points) appState.points = data.points;
+                updateBlackDisplay();
+                renderTable();
+                if (chart && chart.setPoints) chart.setPoints(appState.points);
+                updateStats();
+            }
         }
     } catch (e) {
         alert(currentLang === 'en' ? ("Black measurement error: " + e.message) : ("测黑场出错: " + e.message));
     } finally {
-        btn.disabled = false;
-        btn.innerText = t('btn_measure_black', '一键测黑场基准');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = t('btn_measure_black', '一键测黑场基准');
+        }
     }
 }
 
@@ -723,20 +763,32 @@ async function measureAllPoints() {
         return;
     }
     const btn = document.getElementById('btn-measure-all');
-    btn.disabled = true;
-    btn.innerHTML = currentLang === 'en' ? 'Reading hardware samples...' : '正在读取硬件采样中...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = currentLang === 'en' ? 'Reading hardware samples...' : '正在读取硬件采样中...';
+    }
 
     try {
         const resp = await fetch('/api/measure/all', { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
             alert(currentLang === 'en' ? ("Measurement interrupted: " + (err.detail || "Hardware error")) : ("【自动化测量中断】\n" + (err.detail || "硬件读取异常")));
+        } else {
+            const data = await resp.json();
+            if (data.points) {
+                appState.points = data.points;
+                renderTable();
+                if (chart && chart.setPoints) chart.setPoints(appState.points);
+                updateStats();
+            }
         }
     } catch (e) {
         alert(currentLang === 'en' ? ("Continuous measurement error: " + e.message) : ("连续测量出错: " + e.message));
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>${t('btn_measure_all', '一键自动测量全套坐标')}</span>`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>${t('btn_measure_all', '一键自动测量全套坐标')}</span>`;
+        }
     }
 }
 
@@ -788,7 +840,16 @@ async function deletePoint(pointId) {
 
     if (confirm(confirmMsg)) {
         try {
-            await fetch(`/api/points/delete/${pointId}`, { method: 'POST' });
+            const resp = await fetch(`/api/points/delete/${pointId}`, { method: 'POST' });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.points) {
+                    appState.points = data.points;
+                    renderTable();
+                    if (chart && chart.setPoints) chart.setPoints(appState.points);
+                    updateStats();
+                }
+            }
         } catch (e) {
             alert(currentLang === 'en' ? ("Delete failed: " + e.message) : ("删除点位失败: " + e.message));
         }
@@ -804,7 +865,16 @@ async function restoreDefaultPoints() {
     if (!confirm(confirmMsg)) return;
 
     try {
-        await fetch('/api/points/reset', { method: 'POST' });
+        const resp = await fetch('/api/points/reset', { method: 'POST' });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.points) {
+                appState.points = data.points;
+                renderTable();
+                if (chart && chart.setPoints) chart.setPoints(appState.points);
+                updateStats();
+            }
+        }
     } catch (e) {
         alert(currentLang === 'en' ? ("Restore failed: " + e.message) : ("恢复默认点位失败: " + e.message));
     }
@@ -889,7 +959,16 @@ async function resetAllPoints() {
         "Reset all measurement records and reload default target coordinates?" : 
         "确定要清空全部实测数据并重置为初始默认坐标吗？";
     if (confirm(confirmMsg)) {
-        await fetch('/api/points/reset', { method: 'POST' });
+        const resp = await fetch('/api/points/reset', { method: 'POST' });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.points) {
+                appState.points = data.points;
+                renderTable();
+                if (chart && chart.setPoints) chart.setPoints(appState.points);
+                updateStats();
+            }
+        }
         await resetOffsets();
     }
 }
@@ -1143,7 +1222,7 @@ function renderValidationUI(primaries, summary) {
 
 async function measureValidationSingle(colorId) {
     const progress = document.getElementById('val-progress-text');
-    progress.innerText = currentLang === 'en' ? `Measuring ${colorId}...` : `正在测量 ${colorId}...`;
+    if (progress) progress.innerText = currentLang === 'en' ? `Measuring ${colorId}...` : `正在测量 ${colorId}...`;
     try {
         const resp = await fetch(`/api/validation/measure/${colorId}`, { method: 'POST' });
         if (!resp.ok) {
@@ -1151,20 +1230,28 @@ async function measureValidationSingle(colorId) {
             alert((currentLang === 'en' ? "Validation Error: " : "【验证测量异常】\n") + (err.detail || "Reading failed"));
         } else {
             const res = await resp.json();
-            progress.innerText = currentLang === 'en' ? `Item complete (Delta xy=${res.item.delta_xy.toFixed(4)})` : `单项完成 (Δxy=${res.item.delta_xy.toFixed(4)})`;
+            if (res.item && appState.validation_primaries) {
+                const idx = appState.validation_primaries.findIndex(v => v.id === res.item.id);
+                if (idx !== -1) appState.validation_primaries[idx] = res.item;
+                if (res.summary) appState.validation_summary = res.summary;
+                renderValidationUI(appState.validation_primaries, appState.validation_summary);
+            }
+            if (progress) progress.innerText = currentLang === 'en' ? `Item complete (Delta xy=${res.item.delta_xy.toFixed(4)})` : `单项完成 (Δxy=${res.item.delta_xy.toFixed(4)})`;
         }
     } catch (e) {
         alert((currentLang === 'en' ? "Validation failed: " : "单项验证测量失败: ") + e.message);
-        progress.innerText = currentLang === 'en' ? 'Ready' : '就绪';
+        if (progress) progress.innerText = currentLang === 'en' ? 'Ready' : '就绪';
     }
 }
 
 async function measureAllValidation() {
     const btn = document.getElementById('btn-val-measure-all');
     const progress = document.getElementById('val-progress-text');
-    btn.disabled = true;
-    btn.innerHTML = currentLang === 'en' ? 'Continuous optical sampling...' : '正在连续光学采样中...';
-    progress.innerText = currentLang === 'en' ? 'Measuring standard primaries (keep probe steady at center)...' : '正在测定基准原色 (请保持探头贴紧靶窗中央)...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = currentLang === 'en' ? 'Continuous optical sampling...' : '正在连续光学采样中...';
+    }
+    if (progress) progress.innerText = currentLang === 'en' ? 'Measuring standard primaries (keep probe steady at center)...' : '正在测定基准原色 (请保持探头贴紧靶窗中央)...';
 
     try {
         const resp = await fetch('/api/validation/measure_all', { method: 'POST' });
@@ -1172,14 +1259,20 @@ async function measureAllValidation() {
             const err = await resp.json();
             alert((currentLang === 'en' ? "Validation Error: " : "【全套验证异常】\n") + (err.detail || "Interrupted"));
         } else {
-            progress.innerText = currentLang === 'en' ? 'All standard primaries measured successfully!' : '全套标准原色测定完成！';
+            const res = await resp.json();
+            if (res.primaries) appState.validation_primaries = res.primaries;
+            if (res.summary) appState.validation_summary = res.summary;
+            renderValidationUI(appState.validation_primaries, appState.validation_summary);
+            if (progress) progress.innerText = currentLang === 'en' ? 'All standard primaries measured successfully!' : '全套标准原色测定完成！';
         }
     } catch (e) {
         alert((currentLang === 'en' ? "Primary validation error: " : "全套原色验证测量出错: ") + e.message);
-        progress.innerText = currentLang === 'en' ? 'Ready' : '就绪';
+        if (progress) progress.innerText = currentLang === 'en' ? 'Ready' : '就绪';
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> ${t('val_all_btn', '一键全测标准原色 (7色)')}`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> ${t('val_all_btn', '一键全测标准原色 (7色)')}`;
+        }
     }
 }
 
