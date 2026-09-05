@@ -731,10 +731,18 @@ function updateStats() {
 function selectPoint(pointId, updateTV = true) {
     appState.selectedPointId = pointId;
     renderTable();
-    chart.setSelectedPoint(pointId);
+    if (chart && chart.setSelectedPoint) {
+        chart.setSelectedPoint(pointId);
+    }
 
-    if (updateTV) {
-        displayOnTV(pointId);
+    if (pointId != null) {
+        const selectedRow = document.querySelector('#points-tbody tr.selected');
+        if (selectedRow) {
+            selectedRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        if (updateTV) {
+            displayOnTV(pointId);
+        }
     }
 }
 
@@ -1105,23 +1113,62 @@ function exportCSV() {
 
 function exportHighResPNG() {
     if (!chart) return;
-    chart.exportHighResPNG(3000, 3000);
+    try {
+        const dataUrl = chart.exportHighResPNG(3000);
+        if (!dataUrl) return;
+        const link = document.createElement('a');
+        link.download = `CIE1931_Gamut_${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        console.error("Export PNG failed:", err);
+        alert(currentLang === 'en' ? 'Failed to export PNG: ' + err.message : '导出PNG失败: ' + err.message);
+    }
 }
 
 function exportSVG() {
     if (!chart) return;
-    chart.exportUniversalSVG();
+    try {
+        const svgStr = chart.exportSVG ? chart.exportSVG() : (chart.exportUniversalSVG ? chart.exportUniversalSVG() : '');
+        if (!svgStr) return;
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `CIE1931_Vector_${new Date().toISOString().slice(0, 10)}.svg`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+        console.error("Export SVG failed:", err);
+        alert(currentLang === 'en' ? 'Failed to export SVG: ' + err.message : '导出SVG失败: ' + err.message);
+    }
+}
+
+function updateGamutToggles() {
+    if (!chart) return;
+    chart.updateOptions({
+        showSpectrumFill: document.getElementById('chk-spectrum')?.checked ?? true,
+        showP3: document.getElementById('chk-p3')?.checked ?? true,
+        showBT2020: document.getElementById('chk-bt2020')?.checked ?? true,
+        showLocus: document.getElementById('chk-locus')?.checked ?? true,
+        showLabels: document.getElementById('chk-labels')?.checked ?? true
+    });
 }
 
 function toggleChartFullscreen() {
     const card = document.getElementById('card-cie-chart');
     if (!card) return;
     const isFull = card.classList.toggle('chart-fullscreen-mode');
+    document.body.classList.toggle('fullscreen-active', isFull);
     const btn = document.getElementById('btn-chart-fullscreen');
 
     if (isFull) {
         if (btn) {
-            btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> ${t('chart_exit_fullscreen', '✕ 退出全屏 [ESC]')}`;
+            btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> <span>${t('chart_exit_fullscreen', '✕ 退出全屏 [ESC]')}</span>`;
             btn.className = 'btn btn-sm btn-danger';
         }
         if (chart) {
@@ -1130,7 +1177,7 @@ function toggleChartFullscreen() {
         }
     } else {
         if (btn) {
-            btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg> ${t('chart_fullscreen', '全屏放大查看')}`;
+            btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg> <span>${t('chart_fullscreen', '全屏放大查看')}</span>`;
             btn.className = 'btn btn-sm btn-primary';
         }
         if (chart) {

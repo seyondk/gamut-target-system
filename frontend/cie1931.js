@@ -180,15 +180,15 @@ class CIE1931Chart {
     }
 
     resize() {
-        const isFullscreen = document.getElementById('card-cie-chart')?.classList.contains('chart-fullscreen-mode');
+        const isFullscreen = document.body.classList.contains('fullscreen-active') || document.getElementById('card-cie-chart')?.classList.contains('chart-fullscreen-mode');
         const rect = this.canvas.parentElement.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
 
         let size;
         if (isFullscreen) {
-            const availH = window.innerHeight - 110;
-            const availW = window.innerWidth - 40;
-            size = Math.min(availW, availH);
+            const availH = window.innerHeight - 130;
+            const availW = window.innerWidth - 60;
+            size = Math.max(300, Math.min(availW, availH));
         } else {
             size = Math.min(rect.width, rect.height > 200 ? rect.height : rect.width);
         }
@@ -318,8 +318,9 @@ class CIE1931Chart {
         } else {
             // Interactive on-screen HUD
             this.drawHUD(ctx);
-            if (extraOpts.hoveredPoint) {
-                this.drawTooltip(ctx, extraOpts.hoveredPoint);
+            const ptToHighlight = extraOpts.hoveredPoint || (extraOpts.selectedPointId ? this.points.find(p => p.id === extraOpts.selectedPointId) : null);
+            if (ptToHighlight) {
+                this.drawTooltip(ctx, ptToHighlight);
             }
         }
     }
@@ -505,6 +506,19 @@ class CIE1931Chart {
             ctx.strokeStyle = '#0f172a';
             ctx.lineWidth = 1 * scale;
             ctx.stroke();
+
+            // Distinctive glowing dashed ring on selected point
+            if (isSelected) {
+                const ptPos = (pt.has_measured && pt.final_x != null) ? this.toPixel(pt.final_x, pt.final_y, b, m, w, h) : pTgt;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(ptPos.x, ptPos.y, 14 * scale, 0, Math.PI * 2);
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2 * scale;
+                ctx.setLineDash([4 * scale, 3 * scale]);
+                ctx.stroke();
+                ctx.restore();
+            }
 
             // Intelligent Outward Label Offset to avoid overlapping
             if (this.options.showLabels) {
@@ -693,13 +707,20 @@ class CIE1931Chart {
     initEventListeners() {
         window.addEventListener('resize', () => this.resize());
 
+        const getMousePos = (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const scaleX = this.canvas.clientWidth / (rect.width || 1);
+            const scaleY = this.canvas.clientHeight / (rect.height || 1);
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        };
+
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const coordBefore = this.toCoord(mouseX, mouseY);
+            const pos = getMousePos(e);
+            const coordBefore = this.toCoord(pos.x, pos.y);
             const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
             const newZoom = Math.max(1.0, Math.min(30.0, this.zoom * zoomFactor));
 
@@ -709,7 +730,7 @@ class CIE1931Chart {
                     this.panX = 0;
                     this.panY = 0;
                 } else {
-                    const coordAfter = this.toCoord(mouseX, mouseY);
+                    const coordAfter = this.toCoord(pos.x, pos.y);
                     this.panX += (coordBefore.x - coordAfter.x);
                     this.panY += (coordBefore.y - coordAfter.y);
                 }
@@ -729,20 +750,21 @@ class CIE1931Chart {
         });
 
         this.canvas.addEventListener('mousemove', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const pos = getMousePos(e);
 
             if (this.isDragging) {
-                const dx = e.clientX - this.dragStartX;
-                const dy = e.clientY - this.dragStartY;
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = this.canvas.clientWidth / (rect.width || 1);
+                const scaleY = this.canvas.clientHeight / (rect.height || 1);
+                const dx = (e.clientX - this.dragStartX) * scaleX;
+                const dy = (e.clientY - this.dragStartY) * scaleY;
                 if (Math.hypot(dx, dy) > 3) {
                     this.hasMovedDrag = true;
                     this.canvas.style.cursor = 'grabbing';
 
                     const b = this.getBounds();
-                    const w = rect.width - this.margin.left - this.margin.right;
-                    const h = rect.height - this.margin.top - this.margin.bottom;
+                    const w = this.canvas.clientWidth - this.margin.left - this.margin.right;
+                    const h = this.canvas.clientHeight - this.margin.top - this.margin.bottom;
                     const deltaX = (dx / w) * (b.maxX - b.minX);
                     const deltaY = (dy / h) * (b.maxY - b.minY);
 
@@ -757,18 +779,18 @@ class CIE1931Chart {
             }
 
             let closest = null;
-            let minDist = 18;
+            let minDist = 28;
 
             for (const pt of this.points) {
                 const pTgt = this.toPixel(pt.target_x, pt.target_y);
-                const d1 = Math.hypot(mouseX - pTgt.x, mouseY - pTgt.y);
+                const d1 = Math.hypot(pos.x - pTgt.x, pos.y - pTgt.y);
                 if (d1 < minDist) {
                     minDist = d1;
                     closest = pt;
                 }
                 if (pt.has_measured && pt.final_x != null && pt.final_y != null) {
                     const pMeas = this.toPixel(pt.final_x, pt.final_y);
-                    const d2 = Math.hypot(mouseX - pMeas.x, mouseY - pMeas.y);
+                    const d2 = Math.hypot(pos.x - pMeas.x, pos.y - pMeas.y);
                     if (d2 < minDist) {
                         minDist = d2;
                         closest = pt;
@@ -790,15 +812,42 @@ class CIE1931Chart {
             }
         });
 
-        this.canvas.addEventListener('click', () => {
+        this.canvas.addEventListener('click', (e) => {
             if (this.hasMovedDrag) return;
-            if (this.hoveredPoint) {
-                this.selectedPointId = this.hoveredPoint.id;
-                if (window.onChartPointSelected) {
-                    window.onChartPointSelected(this.hoveredPoint.id);
+            const pos = getMousePos(e);
+            let closest = null;
+            let minDist = 28;
+
+            for (const pt of this.points) {
+                const pTgt = this.toPixel(pt.target_x, pt.target_y);
+                const d1 = Math.hypot(pos.x - pTgt.x, pos.y - pTgt.y);
+                if (d1 < minDist) {
+                    minDist = d1;
+                    closest = pt;
                 }
-                this.render();
+                if (pt.has_measured && pt.final_x != null && pt.final_y != null) {
+                    const pMeas = this.toPixel(pt.final_x, pt.final_y);
+                    const d2 = Math.hypot(pos.x - pMeas.x, pos.y - pMeas.y);
+                    if (d2 < minDist) {
+                        minDist = d2;
+                        closest = pt;
+                    }
+                }
             }
+
+            if (closest) {
+                this.selectedPointId = closest.id;
+                this.hoveredPoint = closest;
+                if (window.onChartPointSelected) {
+                    window.onChartPointSelected(closest.id);
+                }
+            } else {
+                this.selectedPointId = null;
+                if (window.onChartPointSelected) {
+                    window.onChartPointSelected(null);
+                }
+            }
+            this.render();
         });
     }
 
@@ -957,14 +1006,16 @@ class CIE1931Chart {
         });
 
         // Header Title & Legend
-        svg += `<text class="title" x="${m.left}" y="42">CIE 1931 色度图 - 超 DCI-P3 广色域测量矢量分析报告</text>\n`;
+        const isEn = this.lang === 'en';
+        const titleText = isEn ? 'CIE 1931 Chromaticity Diagram - Target Gamut & Offset Vector Report' : 'CIE 1931 色度图 - 广色域打点测试与补差分析矢量报告';
+        svg += `<text class="title" x="${m.left}" y="42">${titleText}</text>\n`;
         svg += `<text class="legend-text" x="${m.left}" y="68">
             <tspan fill="#06b6d4">■ DCI-P3 (D65)</tspan>   
             <tspan fill="#ec4899">■ BT.2020</tspan>   
             ${this.options.showSRGB ? '<tspan fill="#f59e0b">■ sRGB</tspan>   ' : ''}
-            <tspan fill="#e2e8f0">◆ 需求点</tspan>   
-            <tspan fill="#10b981">● 实测达标</tspan>   
-            <tspan fill="#ef4444">● 超差 (Δxy&gt;0.006)</tspan>
+            <tspan fill="#e2e8f0">◆ ${isEn ? 'Target Point' : '需求点'}</tspan>   
+            <tspan fill="#10b981">● ${isEn ? 'Measured OK' : '实测达标'}</tspan>   
+            <tspan fill="#ef4444">● ${isEn ? 'Delta xy>0.006' : '超差 (Δxy&gt;0.006)'}</tspan>
         </text>\n`;
 
         // Axes titles
@@ -973,5 +1024,9 @@ class CIE1931Chart {
 
         svg += `</svg>`;
         return svg;
+    }
+
+    exportUniversalSVG(viewWidth = 1200, viewHeight = 1200) {
+        return this.exportSVG(viewWidth, viewHeight);
     }
 }
