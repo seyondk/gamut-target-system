@@ -221,6 +221,19 @@ function toggleLanguage() {
     applyTranslations();
 }
 
+function formatApiError(err) {
+    if (!err) return "Unknown error";
+    if (typeof err === "string") return err;
+    if (typeof err.detail === "string") return err.detail;
+    if (Array.isArray(err.detail)) {
+        return err.detail.map(d => d.msg || JSON.stringify(d)).join("; ");
+    }
+    if (err.detail && typeof err.detail === "object") {
+        return err.detail.msg || JSON.stringify(err.detail);
+    }
+    return err.message || JSON.stringify(err);
+}
+
 function updateMeterDisplay() {
     const dot = document.getElementById('meter-dot');
     const label = document.getElementById('meter-label');
@@ -228,13 +241,32 @@ function updateMeterDisplay() {
     const info = appState.meter_info;
     if (info && info.has_hardware) {
         dot.className = 'dot dot-green';
-        label.innerText = currentLang === 'en' ? 'Colorimeter Connected' : '硬件色度计已连接';
+        let devName = '';
+        if (info.instruments && Array.isArray(info.instruments)) {
+            const hw = info.instruments.find(i => i.is_colorimeter);
+            if (hw && hw.name) {
+                let clean = hw.name.replace(/^hid\d*:\s*\(?/, '').replace(/\)?$/, '').trim();
+                if (clean.includes(',')) {
+                    clean = clean.split(',')[0].trim();
+                }
+                devName = clean;
+            }
+        }
+        if (devName) {
+            label.innerText = devName;
+            label.title = `${currentLang === 'en' ? 'Hardware probe connected' : '硬件色度计已就绪'}: ${devName}`;
+        } else {
+            label.innerText = currentLang === 'en' ? 'Colorimeter Connected' : '硬件色度计已连接';
+            label.title = '';
+        }
     } else if (info) {
         dot.className = 'dot dot-purple';
         label.innerText = currentLang === 'en' ? 'Colorimeter Disconnected' : '未检测到物理探头';
+        label.title = '';
     } else {
         dot.className = 'dot dot-purple';
         label.innerText = currentLang === 'en' ? 'Checking probe status...' : '探头状态检查中...';
+        label.title = '';
     }
 }
 
@@ -719,7 +751,7 @@ async function measureSingle(pointId) {
         const resp = await fetch(`/api/measure/point/${pointId}`, { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
-            alert(currentLang === 'en' ? ("Measurement failed: " + (err.detail || "error")) : ("测量失败: " + (err.detail || "异常")));
+            alert(currentLang === 'en' ? ("Measurement failed: " + formatApiError(err)) : ("测量失败: " + formatApiError(err)));
         } else {
             const data = await resp.json();
             if (data.point) {
@@ -754,7 +786,7 @@ async function measureBlack() {
         const resp = await fetch('/api/measure/black', { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
-            alert(currentLang === 'en' ? ("Black measurement error: " + (err.detail || "failed")) : ("【黑场测量异常】\n" + (err.detail || "读取失败")));
+            alert(currentLang === 'en' ? ("Black measurement error: " + formatApiError(err)) : ("【黑场测量异常】\n" + formatApiError(err)));
         } else {
             const data = await resp.json();
             if (data.black_baseline) {
@@ -795,7 +827,7 @@ async function measureAllPoints() {
         const resp = await fetch('/api/measure/all', { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
-            alert(currentLang === 'en' ? ("Measurement interrupted: " + (err.detail || "Hardware error")) : ("【自动化测量中断】\n" + (err.detail || "硬件读取异常")));
+            alert(currentLang === 'en' ? ("Measurement interrupted: " + formatApiError(err)) : ("【自动化测量中断】\n" + formatApiError(err)));
         } else {
             const data = await resp.json();
             if (data.points) {
@@ -1250,7 +1282,7 @@ async function measureValidationSingle(colorId) {
         const resp = await fetch(`/api/validation/measure/${colorId}`, { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
-            alert((currentLang === 'en' ? "Validation Error: " : "【验证测量异常】\n") + (err.detail || "Reading failed"));
+            alert((currentLang === 'en' ? "Validation Error: " : "【验证测量异常】\n") + formatApiError(err));
         } else {
             const res = await resp.json();
             if (res.item && appState.validation_primaries) {
@@ -1280,7 +1312,7 @@ async function measureAllValidation() {
         const resp = await fetch('/api/validation/measure_all', { method: 'POST' });
         if (!resp.ok) {
             const err = await resp.json();
-            alert((currentLang === 'en' ? "Validation Error: " : "【全套验证异常】\n") + (err.detail || "Interrupted"));
+            alert((currentLang === 'en' ? "Validation Error: " : "【全套验证异常】\n") + formatApiError(err));
         } else {
             const res = await resp.json();
             if (res.primaries) appState.validation_primaries = res.primaries;

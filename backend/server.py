@@ -391,7 +391,6 @@ async def measure_black():
         state.is_measuring = False
 
 
-@app.post("/api/measure/{point_id}")
 @app.post("/api/measure/point/{point_id}")
 async def measure_point(point_id: int):
     target = None
