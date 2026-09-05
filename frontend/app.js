@@ -1572,9 +1572,9 @@ function setupDocumentPipWindow(pip) {
 
         // Open dedicated fullscreen window on target display
         const win = window.open(
-            '/patch?autofs=1',
+            '/patch?mode=fullscreen&from=pip',
             'TVPatchFullscreenWindow',
-            `left=${targetX},top=${targetY},width=${targetW},height=${targetH},menubar=no,toolbar=no,location=no,status=no`
+            `popup,fullscreen,left=${targetX},top=${targetY},width=${targetW},height=${targetH},menubar=no,toolbar=no,location=no,status=no`
         );
         if (win) {
             win.focus();
@@ -1862,33 +1862,13 @@ async function toggleTVPatchWindow() {
     window.open('/patch', 'TVPatchWindow', 'width=800,height=800,menubar=no,toolbar=no,location=no,status=no');
 }
 
-let patchWindowRef = null;
-
+// Backward compatibility alias so any legacy calls work seamlessly
 function openTVPatchWindow() {
-    if (patchWindowRef && !patchWindowRef.closed) {
-        patchWindowRef.focus();
-        return;
-    }
-    const w = 920;
-    const h = 640;
-    const left = Math.max(0, Math.round((window.screen.availWidth - w) / 2));
-    const top = Math.max(0, Math.round((window.screen.availHeight - h) / 2));
-    patchWindowRef = window.open(
-        '/patch',
-        'TVPatchWindow',
-        `left=${left},top=${top},width=${w},height=${h},menubar=no,toolbar=no,location=no,status=no`
-    );
-    if (patchWindowRef) {
-        patchWindowRef.focus();
-    }
-}
-
-function toggleTVPatchWindow() {
-    openTVPatchWindow();
+    toggleTVPatchWindow();
 }
 
 function openFullscreenPatchWindow() {
-    openTVPatchWindow();
+    toggleTVPatchWindow();
 }
 
 function exportCSV() {

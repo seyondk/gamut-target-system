@@ -450,7 +450,6 @@
 
     <!-- Quick Tool Buttons -->
     <div id="toolbar">
-        <button id="btn-top" onclick="togglePinTop()" title="在系统最高层级置顶悬浮显示测色靶窗 (支持任意应用之上)"><span id="lbl-btn-top">📌 强制置顶</span> [T]</button>
         <button id="btn-fs" onclick="toggleFullscreen()"><span id="lbl-btn-fs">全屏切换 [F]</span></button>
         <button id="btn-size" onclick="cycleSize()"><span id="lbl-btn-size">靶窗尺寸</span> (<span id="btn-size-label">20%</span>) [S]</button>
         <button id="btn-crosshair" onclick="toggleCrosshair()">准星开关 [H]</button>
@@ -623,9 +622,9 @@
             const elLblClipped = document.getElementById('lbl-clipped');
             if (elLblClipped) elLblClipped.innerText = dict.lbl_clipped;
             const elBtnFs = document.getElementById('btn-fs');
-            if (elBtnFs) elBtnFs.innerText = dict.btn_fs;
-            const elLblBtnTop = document.getElementById('lbl-btn-top');
-            if (elLblBtnTop) elLblBtnTop.innerText = (pipWindow || isSoftwarePinned) ? dict.btn_top_active : dict.btn_top;
+            if (elBtnFs) {
+                elBtnFs.innerText = document.fullscreenElement ? (currentLang === 'en' ? 'Switch to Small Window [F]' : '切换回小窗 [F]') : dict.btn_fs;
+            }
             const elHudPinned = document.getElementById('hud-pinned-tag');
             if (elHudPinned) elHudPinned.innerText = dict.hud_pinned;
             const elPipTitle = document.getElementById('pip-title');
@@ -778,23 +777,32 @@
                 document.documentElement.requestFullscreen().catch(e => console.warn("Fullscreen request warning:", e));
             } else {
                 document.exitFullscreen().catch(e => console.warn("Exit fullscreen warning:", e));
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('from') === 'pip') {
+                    if (window.opener && typeof window.opener.toggleTVPatchWindow === 'function') {
+                        window.opener.toggleTVPatchWindow();
+                        window.close();
+                    }
+                }
             }
         }
 
-        // Fullscreen state listener: Hide pinned button and update label when in fullscreen
+        // Fullscreen state listener: update label when in fullscreen
         document.addEventListener('fullscreenchange', () => {
             const isFs = !!document.fullscreenElement;
-            const btnTop = document.getElementById('btn-top');
             const lblBtnFs = document.getElementById('lbl-btn-fs');
 
             if (isFs) {
-                // In fullscreen: HIDE the "置顶" button, show "Switch back to small window"
-                if (btnTop) btnTop.style.display = 'none';
                 if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Switch to Small Window [F]' : '切换回小窗 [F]';
             } else {
-                // In small window: SHOW the "置顶" button, show "Fullscreen [F]"
-                if (btnTop) btnTop.style.display = '';
                 if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('from') === 'pip') {
+                    if (window.opener && typeof window.opener.toggleTVPatchWindow === 'function') {
+                        window.opener.toggleTVPatchWindow();
+                        window.close();
+                    }
+                }
             }
         });
 
