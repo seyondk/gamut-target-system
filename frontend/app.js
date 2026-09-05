@@ -23,6 +23,7 @@ const I18N = {
         meter_missing: "未检测到物理探头",
         val_btn: "标准原色校准验证",
         tv_window_btn: "打开测色靶窗",
+        tv_window_top_btn: "📌 打开置顶靶窗",
         export_csv_btn: "导出 CSV",
         export_png_btn: "导出 4K PNG",
         export_svg_btn: "导出矢量图 (SVG)",
@@ -119,6 +120,7 @@ const I18N = {
         meter_missing: "Colorimeter Disconnected",
         val_btn: "Primary Calibration Validation",
         tv_window_btn: "Open Target Patch",
+        tv_window_top_btn: "📌 Open Pinned Patch",
         export_csv_btn: "Export CSV",
         export_png_btn: "Export 4K PNG",
         export_svg_btn: "Export Vector (SVG)",
@@ -1103,8 +1105,9 @@ async function toggleFlareComp() {
     });
 }
 
-function openTVPatchWindow() {
-    window.open('/patch', 'TVPatchWindow', 'width=960,height=600,menubar=no,toolbar=no,location=no,status=no');
+function openTVPatchWindow(pinned = false) {
+    const url = pinned ? '/patch?pin=1' : '/patch';
+    window.open(url, 'TVPatchWindow', 'width=960,height=600,menubar=no,toolbar=no,location=no,status=no');
 }
 
 function exportCSV() {

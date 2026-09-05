@@ -233,6 +233,52 @@
             font-weight: 700;
         }
 
+        button.btn-pinned {
+            background: #0284c7 !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.6) !important;
+        }
+
+        .pinned-tag {
+            background: rgba(56, 189, 248, 0.25);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.6);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* Placeholder shown in original window when Picture-in-Picture Always-on-Top is active */
+        #pip-placeholder {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #090e17;
+            color: #94a3b8;
+            text-align: center;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        #pip-placeholder.active {
+            display: flex;
+        }
+
+        .pip-card {
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-radius: 12px;
+            padding: 26px 36px;
+            max-width: 460px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75);
+            animation: cardPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
         /* Dedicated Fullscreen Edge Flash Overlay */
         #flash-overlay {
             position: fixed;
@@ -342,6 +388,20 @@
     <!-- Screen Edge Pulse Flash Overlay -->
     <div id="flash-overlay"></div>
 
+    <!-- Placeholder displayed in main window while Picture-in-Picture Always-on-Top is active -->
+    <div id="pip-placeholder">
+        <div class="pip-card">
+            <div style="font-size: 38px; margin-bottom: 8px;">📌</div>
+            <h2 id="pip-title" style="font-size: 16px; color: #38bdf8; margin-bottom: 8px;">测色靶窗已在系统置顶悬浮窗中运行</h2>
+            <p id="pip-desc" style="font-size: 12px; color: #94a3b8; line-height: 1.6; margin-bottom: 16px;">
+                靶向窗口正以最高层级悬浮在操作系统所有应用窗口之上。可将悬浮窗拖动至目标屏幕，并将色度计探头对准中央框线。<br>按快捷键 [T] 或关闭悬浮窗即可还原回当前窗口。
+            </p>
+            <button onclick="togglePinTop()" style="background:#0284c7; border-color:#38bdf8; font-weight:600; padding:8px 18px;">
+                <span id="lbl-pip-return">退出置顶悬浮 [T]</span>
+            </button>
+        </div>
+    </div>
+
     <div id="container">
         <!-- Target color square, hidden/transparent in Standby Mode -->
         <div id="patch" class="patch-20"></div>
@@ -368,6 +428,7 @@
     <div id="hud">
         <h1>
             <span id="hud-title-text">外接电视测色靶窗 (TV HDMI Target)</span>
+            <span class="pinned-tag" id="hud-pinned-tag" style="display:none;">📌 强制置顶</span>
             <span class="hdr-tag" id="hud-hdr-tag">HDR 开启</span>
         </h1>
         <div class="hud-row">
@@ -386,6 +447,7 @@
 
     <!-- Quick Tool Buttons -->
     <div id="toolbar">
+        <button id="btn-top" onclick="togglePinTop()" title="在系统最高层级置顶悬浮显示测色靶窗 (支持任意应用之上)"><span id="lbl-btn-top">📌 强制置顶</span> [T]</button>
         <button id="btn-fs" onclick="toggleFullscreen()">全屏切换 [F]</button>
         <button id="btn-size" onclick="cycleSize()"><span id="lbl-btn-size">靶窗尺寸</span> (<span id="btn-size-label">20%</span>) [S]</button>
         <button id="btn-crosshair" onclick="toggleCrosshair()">准星开关 [H]</button>
@@ -473,6 +535,12 @@
                 accurate: "精准映射",
                 native_passthrough: "Native 原生直通",
                 btn_fs: "全屏切换 [F]",
+                btn_top: "📌 强制置顶 [T]",
+                btn_top_active: "✕ 取消置顶 [T]",
+                hud_pinned: "📌 强制置顶",
+                pip_title: "测色靶窗已在系统置顶悬浮窗中运行",
+                pip_desc: "靶向窗口正以最高层级悬浮在操作系统所有应用窗口之上。可将悬浮窗拖动至目标屏幕，并将色度计探头对准中央框线。<br>按快捷键 [T] 或关闭悬浮窗即可还原回当前窗口。",
+                pip_return: "退出置顶悬浮 [T]",
                 btn_size: "靶窗尺寸",
                 btn_crosshair: "准星开关 [H]",
                 btn_bg: "背景黑/灰 [B]",
@@ -507,6 +575,12 @@
                 accurate: "Accurately Mapped",
                 native_passthrough: "Native Passthrough",
                 btn_fs: "Fullscreen [F]",
+                btn_top: "📌 Always on Top [T]",
+                btn_top_active: "✕ Unpin [T]",
+                hud_pinned: "📌 Pinned",
+                pip_title: "Target patch is running in Always-on-Top window",
+                pip_desc: "The patch is floating at the highest OS window level above all desktop applications. Place probe on the floating window.<br>Press [T] or close the floating window to restore.",
+                pip_return: "Exit Always-on-Top [T]",
                 btn_size: "Patch Size",
                 btn_crosshair: "Crosshair [H]",
                 btn_bg: "Bg Black/Gray [B]",
@@ -547,6 +621,16 @@
             if (elLblClipped) elLblClipped.innerText = dict.lbl_clipped;
             const elBtnFs = document.getElementById('btn-fs');
             if (elBtnFs) elBtnFs.innerText = dict.btn_fs;
+            const elLblBtnTop = document.getElementById('lbl-btn-top');
+            if (elLblBtnTop) elLblBtnTop.innerText = (pipWindow || isSoftwarePinned) ? dict.btn_top_active : dict.btn_top;
+            const elHudPinned = document.getElementById('hud-pinned-tag');
+            if (elHudPinned) elHudPinned.innerText = dict.hud_pinned;
+            const elPipTitle = document.getElementById('pip-title');
+            if (elPipTitle) elPipTitle.innerText = dict.pip_title;
+            const elPipDesc = document.getElementById('pip-desc');
+            if (elPipDesc) elPipDesc.innerHTML = dict.pip_desc;
+            const elPipReturn = document.getElementById('lbl-pip-return');
+            if (elPipReturn) elPipReturn.innerText = dict.pip_return;
             const elLblBtnSize = document.getElementById('lbl-btn-size');
             if (elLblBtnSize) elLblBtnSize.innerText = dict.btn_size;
             const elBtnCrosshair = document.getElementById('btn-crosshair');
@@ -588,6 +672,19 @@
                 flash.classList.remove('flashing');
                 void flash.offsetWidth; // trigger reflow
                 flash.classList.add('flashing');
+            }
+
+            // Also flash inside PiP window if currently open
+            if (pipWindow && pipWindow.document) {
+                let pipFlash = pipWindow.document.getElementById('pip-flash-overlay');
+                if (!pipFlash) {
+                    pipFlash = document.createElement('div');
+                    pipFlash.id = 'pip-flash-overlay';
+                    pipFlash.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:9000;box-shadow:inset 0 0 160px 50px #10b981;opacity:0;transition:opacity 0.2s ease;';
+                    pipWindow.document.body.appendChild(pipFlash);
+                }
+                pipFlash.style.opacity = '1';
+                setTimeout(() => { if (pipFlash) pipFlash.style.opacity = '0'; }, 2200);
             }
 
             const overlay = document.getElementById('complete-overlay');
@@ -745,18 +842,167 @@
             };
         }
 
+        // ==========================================
+        // Always on Top (强制置顶) Implementation
+        // ==========================================
+        let pipWindow = null;
+        let isSoftwarePinned = false;
+        let wakeLockSentinel = null;
+
+        async function requestScreenWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockSentinel = await navigator.wakeLock.request('screen');
+                    wakeLockSentinel.addEventListener('release', () => {
+                        wakeLockSentinel = null;
+                    });
+                }
+            } catch (e) {
+                console.warn("Screen WakeLock unavailable:", e);
+            }
+        }
+
+        function releaseScreenWakeLock() {
+            if (wakeLockSentinel) {
+                try { wakeLockSentinel.release(); } catch (e) {}
+                wakeLockSentinel = null;
+            }
+        }
+
+        function updatePinUI(active) {
+            const dict = getDict();
+            const btnTop = document.getElementById('btn-top');
+            const lblBtnTop = document.getElementById('lbl-btn-top');
+            const pinnedTag = document.getElementById('hud-pinned-tag');
+            const pipPlaceholder = document.getElementById('pip-placeholder');
+
+            if (active) {
+                if (btnTop) btnTop.classList.add('btn-pinned');
+                if (lblBtnTop) lblBtnTop.innerText = dict.btn_top_active;
+                if (pinnedTag) {
+                    pinnedTag.style.display = 'inline-block';
+                    pinnedTag.innerText = dict.hud_pinned;
+                }
+                if (pipPlaceholder && pipWindow) {
+                    pipPlaceholder.classList.add('active');
+                }
+            } else {
+                if (btnTop) btnTop.classList.remove('btn-pinned');
+                if (lblBtnTop) lblBtnTop.innerText = dict.btn_top;
+                if (pinnedTag) pinnedTag.style.display = 'none';
+                if (pipPlaceholder) pipPlaceholder.classList.remove('active');
+            }
+        }
+
+        async function togglePinTop() {
+            // 1. If PiP is active, close it and return container to main window
+            if (pipWindow) {
+                try {
+                    pipWindow.close();
+                } catch (e) {}
+                pipWindow = null;
+                updatePinUI(false);
+                return;
+            }
+
+            // 2. If software pinned mode is active, disable it
+            if (isSoftwarePinned) {
+                isSoftwarePinned = false;
+                releaseScreenWakeLock();
+                updatePinUI(false);
+                return;
+            }
+
+            const dict = getDict();
+
+            // 3. Document Picture-in-Picture API (Chromium Native OS-level Always-on-Top)
+            if ('documentPictureInPicture' in window) {
+                try {
+                    const pip = await window.documentPictureInPicture.requestWindow({
+                        width: 520,
+                        height: 520,
+                        disallowReturnToOpener: false
+                    });
+                    pipWindow = pip;
+
+                    // Copy stylesheets and inline styles to PiP window
+                    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
+                        pip.document.head.appendChild(el.cloneNode(true));
+                    });
+
+                    pip.document.title = `${dict.page_title} - ${dict.hud_pinned}`;
+                    pip.document.body.style.margin = '0';
+                    pip.document.body.style.padding = '0';
+                    pip.document.body.style.background = '#000000';
+                    pip.document.body.style.overflow = 'hidden';
+                    pip.document.body.style.width = '100vw';
+                    pip.document.body.style.height = '100vh';
+
+                    // Move container into PiP window
+                    pip.document.body.appendChild(container);
+
+                    // Forward keydown shortcuts from PiP window
+                    pip.addEventListener('keydown', handleKeydown);
+
+                    requestScreenWakeLock();
+                    updatePinUI(true);
+
+                    // When PiP window is closed, return container to main window
+                    pip.addEventListener('pagehide', () => {
+                        document.body.insertBefore(container, document.getElementById('complete-overlay'));
+                        pipWindow = null;
+                        updatePinUI(false);
+                        releaseScreenWakeLock();
+                    });
+
+                    return;
+                } catch (err) {
+                    console.warn("Document Picture-in-Picture request failed or rejected:", err);
+                }
+            }
+
+            // 4. Fallback: Aggressive keep-focused mode + Wake Lock
+            isSoftwarePinned = true;
+            requestScreenWakeLock();
+            window.focus();
+            updatePinUI(true);
+        }
+
+        window.addEventListener('blur', () => {
+            if (isSoftwarePinned && !pipWindow) {
+                setTimeout(() => {
+                    if (isSoftwarePinned) window.focus();
+                }, 100);
+            }
+        });
+
         // Keyboard Shortcuts
-        window.addEventListener('keydown', (e) => {
+        function handleKeydown(e) {
             const key = e.key.toLowerCase();
-            if (key === 'f') toggleFullscreen();
+            if (key === 't') togglePinTop();
+            else if (key === 'f') toggleFullscreen();
             else if (key === 's') cycleSize();
             else if (key === 'h') toggleCrosshair();
             else if (key === 'b') toggleBackground();
             else if (key === 'c') setStandbyMode();
-            else if (key === 'escape') dismissCompletionOverlay();
-        });
+            else if (key === 'escape') {
+                dismissCompletionOverlay();
+                if (pipWindow) togglePinTop();
+            }
+        }
 
+        window.addEventListener('keydown', handleKeydown);
         window.addEventListener('dblclick', toggleFullscreen);
+
+        // Check for ?pin=1 or ?top=1 in URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('top') || urlParams.has('pin')) {
+            window.addEventListener('click', () => {
+                if (!pipWindow && !isSoftwarePinned) {
+                    togglePinTop();
+                }
+            }, { once: true });
+        }
 
         // Apply initial language & guarantee Standby Mode on initial load (pure black + crosshair only)
         applyLang();

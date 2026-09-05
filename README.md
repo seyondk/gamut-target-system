@@ -28,23 +28,34 @@
   - 默认内置 P1 至 P15 关键饱和度与边界点（包含修正后的超蓝界极限 P11 `(0.1405, 0.0530)`）。
   - 支持动态新增自定义点位（自由命名与设定需求坐标），支持表格点位即时单点删除（仅作用于当前页内存，重新运行或点击恢复按钮即可复原）。
 - **CIE 1931 色域图平滑交互与矢量图导出**：
-  - 支持鼠标滚轮缩放（最高 30x）与左键拖拽平移，一键复位。
-  - 支持全屏沉浸式色度图视图与可选色彩底图叠加渲染。
-  - 支持一键导出无水印、无操作按钮干扰的高清晰度 **PNG** 与 **标准矢量 SVG**。
+  - 动态几何坐标换算器：消除全局缩放与 Retina 高分屏下的像素偏移，鼠标悬停与点击取点实现 **100% 像素级精准对齐**。
+  - 点击点位呈现专属**发光虚线选中光环**，其详细参数卡片（需求值、实测值、Δxy、Δu'v'、超色域判定）**稳定常驻显示**，右侧数据表格自动联动平滑滚动并高亮对应行。
+  - 沉浸式全屏放大视图：独立深黑全屏视口，彻底杜绝按钮重叠与表格元素穿透；彩色连续底图、DCI-P3、BT.2020、光谱轨迹、标号 5 组图层独立复选显隐。
+  - 一键导出无水印、无操作按钮干扰的 3000×3000 4K 高分辨率 **PNG** 与标准无损矢量 **SVG**（自动触发浏览器下载保存）。
 - **微调补差与色彩预测 (Offset & Compensation)**：
-  - 每点独立支持 $(\delta x, \delta y)$ 步进调节与输入，实时预测补差后的期望落点。
+  - 每点独立支持 $(\delta x, \delta y)$ 步进调节与输入，实时预测补差后的期望落点与 RGB 驱动信号。
   - 支持一键全局平移补差（Global Offset），快速消除探头硬件或系统全局色偏。
 - **感知均匀色差 ($\Delta u'v'$) 与 阈值高亮报警**：
   - 自动计算 CIE 1976 UCS 感知均匀色度差 $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$。
-  - 自动对实测色偏 $\Delta xy > 0.006$ 的点位进行高亮警示。
-- **外接电视专用独立测色靶窗 (`/patch`)**：
-  - 独立全黑待机模式：初始无色块输出，仅显示中央定位准星，防止长时间静止灼屏。
-  - 键盘快捷键：`[F]` 全屏切换、`[S]` 切换靶窗比例（10%、20%、50%、全屏）、`[H]` 准星开关、`[B]` 背景黑/灰切换、`[C]` 复位待机。
-  - 自动测色完成提示：整轮点位或验证测试完成后，靶窗触发屏幕四周呼吸闪烁动画与上升琶音音效提醒。
-- **探头与出厂校色基准验证 (Validation)**：
-  - 一键对 7 项标准原色与白点（红/绿/蓝/青/品红/黄/D65白场）执行光学复测，评估色度计探头状态与屏幕出厂校准精度。
+  - 自动对实测色偏 $\Delta xy > 0.006$ 的点位进行醒目高亮警示。
+- **外接电视专用独立测色靶窗 (`/patch`) 与 强制置顶功能 (Always on Top)**：
+  - **系统级强制置顶 (Always on Top / PiP)**：集成 W3C Document Picture-in-Picture API，点击工具栏 `[📌 强制置顶]` 或快捷键 **`[T]`**，即可将靶窗提升为操作系统原生最高层级的独立悬浮窗（置顶于所有桌面应用之上）；主控制台提供 **`[📌 打开置顶靶窗]`** 一键直达入口。
+  - **防息屏保持 (Screen Wake Lock)**：置顶运行期间自动启用屏幕唤醒锁，防止测试过程中电视或显示器意外息屏休眠。
+  - **全黑防灼屏待机模式**：初始无色彩方块输出，仅显示中央定位准星，防止长时间静止高亮图像导致 OLED 灼屏。
+  - **完整键盘快捷键体系**：
+    - `[T]`：开启 / 关闭系统级强制置顶 (Always on Top)
+    - `[F]`：全屏沉浸切换 (Fullscreen)
+    - `[S]`：循环切换靶窗显示比例 (10%、20%、50%、全屏)
+    - `[H]`：开启 / 关闭中央准星定位标框
+    - `[B]`：切换纯黑 / 18% 灰背景底色
+    - `[C]`：一键复位为全黑待机定位模式
+    - `[ESC]`：关闭测试完成通知横幅 / 退出置顶
+  - **自动测色完成视听提醒**：整轮点位或验证测试完成后，靶窗触发屏幕四周绿色脉冲呼吸闪烁与上升琶音音效提醒。
+- **探头与出厂校色基准验证 (Validation) 及 型号直观识别**：
+  - 自动检测并精准显示物理探头硬件真实型号（如 `X-Rite i1 DisplayPro` / `Calibrite Display Plus HL`），配备状态圆点指示。
+  - 一键对 7 项标准原色与白点（红/绿/蓝/青/品红/黄/D65白场）执行光学复测，评估色度计探头状态与屏幕出厂校准水准。
 - **完整中英双语界面 (i18n)**：
-  - 前端控制台右上角一键切换 `[ 🌐 EN / 中文 ]`，实时无刷新切换，偏好记忆持久化；外接电视靶窗同步响应。
+  - 前端控制台右上角一键切换 `[ 🌐 EN / 中文 ]`，实时无刷新切换，偏好记忆持久化；外接电视靶窗同步联动。
   - 终端控制台、后台运行日志及导出的 CSV 报表均采用纯英文标准化格式，彻底杜绝乱码。
 
 ---
@@ -109,20 +120,31 @@ The system communicates directly with hardware colorimeters (**Calibrite / X-Rit
   - Add custom target points with user-defined names and coordinates.
   - Instant row deletion for any target point (P1–P15 and custom points; session-based with one-click restore).
 - **Interactive CIE 1931 Chromaticity Diagram & Vector Export**:
-  - Smooth wheel zoom (up to 30x) and drag-to-pan with one-click reset.
-  - Fullscreen expansion and optional chromatic spectrum overlay.
-  - Clean export of high-resolution **PNG** and resolution-independent **SVG** without UI overlays.
+  - Dynamic geometric coordinate scaler: eliminates viewport zoom and Retina high-DPI offsets for **100% pixel-accurate point targeting**.
+  - Clicking any point reveals an illuminated **dashed selection ring** and keeps the detailed parameter card (demand xy, measured xy, Δxy, Δu'v', gamut pass/exceeded status) **permanently displayed**, while the data table smoothly scrolls and highlights the row.
+  - Immersive fullscreen diagram mode: isolated deep-slate viewport eliminating element overlap; 5 independent toggle layers for Spectrum, DCI-P3, BT.2020, Spectral Locus, and Labels.
+  - One-click clean export of 3000×3000 4K high-resolution **PNG** and resolution-independent **SVG** (automatically initiates browser download).
 - **Fine-Tuning Offset & Expected Compensation**:
-  - Independent $(\delta x, \delta y)$ adjustments per coordinate with immediate target update.
+  - Independent $(\delta x, \delta y)$ adjustments per coordinate with immediate target update and RGB drive signal calculation.
   - Global translation offset to rectify systematic colorimeter or pipeline shifts.
 - **Perceptually Uniform Color Difference ($\Delta u'v'$) & Threshold Highlighting**:
   - Calculates CIE 1976 UCS distance: $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$.
   - Highlights test points in warning red whenever $\Delta xy > 0.006$.
-- **Dedicated External TV Target Window (`/patch`)**:
-  - Default pure-black standby mode with crosshair target alignment ring (prevents panel burn-in).
-  - Hotkeys: `[F]` Fullscreen, `[S]` Cycle size (10%, 20%, 50%, 100%), `[H]` Crosshair toggle, `[B]` Black/Gray background, `[C]` Standby reset.
-  - Automatic completion alert with border pulse animation and audio chime.
-- **Colorimeter & Factory Calibration Validation**:
+- **Dedicated External TV Target Window (`/patch`) with Always-on-Top (PiP)**:
+  - **Native OS Always-on-Top (PiP)**: Built-in W3C Document Picture-in-Picture API enables true OS-level always-on-top floating patch window above all desktop applications with one click `[📌 Always on Top]` or hotkey **`[T]`**; quick launch button `[📌 Open Pinned Patch]` on the main dashboard.
+  - **Screen Wake Lock**: Automatically maintains display wakefulness during calibration to prevent unexpected screen dimming or sleep.
+  - **Pure-Black Standby Mode**: Default zero-luminance background with high-visibility center crosshair and alignment ring, preventing OLED panel burn-in.
+  - **Keyboard Shortcut System**:
+    - `[T]`: Toggle Always-on-Top mode (Picture-in-Picture)
+    - `[F]`: Fullscreen toggle
+    - `[S]`: Cycle patch window size (10%, 20%, 50%, 100%)
+    - `[H]`: Toggle center crosshair alignment ring
+    - `[B]`: Toggle black / 18% gray background
+    - `[C]`: One-key reset to black standby alignment mode
+    - `[ESC]`: Dismiss completion overlay / Exit pinned window
+  - **Completion Audiovisual Alert**: Automatic border pulse flash and ascending chime upon finishing batch testing or validation.
+- **Colorimeter Hardware Model Recognition & Factory Validation**:
+  - Automatic detection and explicit display of physical hardware model (e.g. `X-Rite i1 DisplayPro` / `Calibrite Display Plus HL`) with live connection dot.
   - One-click optical verification across 7 primary/secondary reference colors and D65 white point.
 - **Full Bilingual i18n & Clean English Output**:
   - Immediate language switching `[ 🌐 EN / 中文 ]` on frontend with `localStorage` persistence.

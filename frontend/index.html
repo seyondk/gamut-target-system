@@ -769,13 +769,20 @@
             </button>
 
             <!-- Launch Target Patch Window -->
-            <button class="btn" id="btn-open-patch" onclick="openTVPatchWindow()">
+            <button class="btn" id="btn-open-patch" onclick="openTVPatchWindow()" title="打开用于给电视送信号的独立测色靶窗 (支持任意尺寸/全屏/准星定位/强制置顶)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                     <line x1="8" y1="21" x2="16" y2="21"></line>
                     <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
                 <span data-i18n="tv_window_btn">打开测色靶窗</span>
+            </button>
+            <button class="btn" id="btn-open-patch-top" onclick="openTVPatchWindow(true)" title="打开测色靶窗并直接启动系统置顶悬浮模式 (Always on Top)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="17" x2="12" y2="22"></line>
+                    <path d="M5 17h14v-2l-2-3V6a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v6l-2 3v2z"></path>
+                </svg>
+                <span data-i18n="tv_window_top_btn">📌 打开置顶靶窗</span>
             </button>
 
             <!-- Export Actions -->
@@ -1089,7 +1096,7 @@
     </div>
 
     <!-- Dependencies -->
-    <script src="/static/cie1931.js?v=6"></script>
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/cie1931.js?v=7"></script>
+    <script src="/static/app.js?v=7"></script>
 </body>
 </html>
