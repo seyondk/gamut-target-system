@@ -22,7 +22,8 @@ const I18N = {
         meter_connected: "硬件色度计已连接",
         meter_missing: "未检测到物理探头",
         val_btn: "标准原色校准验证",
-        tv_window_btn: "打开测色靶窗",
+        tv_window_btn: "打开测色靶窗 (置顶)",
+        tv_fullscreen_btn: "全屏靶窗 (外接电视)",
         tv_window_btn_pinned: "✓ 测色靶窗置顶中 (点击退出)",
         patch_size_10: "靶窗: 10% 面积",
         patch_size_20: "靶窗: 20% (标准)",
@@ -123,7 +124,8 @@ const I18N = {
         meter_connected: "Colorimeter Connected",
         meter_missing: "Colorimeter Disconnected",
         val_btn: "Primary Calibration Validation",
-        tv_window_btn: "Open Target Patch",
+        tv_window_btn: "Target Patch (Pinned)",
+        tv_fullscreen_btn: "Fullscreen Patch (External TV)",
         tv_window_btn_pinned: "✓ Target Patch Pinned (Click to exit)",
         patch_size_10: "Patch: 10% Area",
         patch_size_20: "Patch: 20% (Standard)",
@@ -1562,58 +1564,27 @@ function setupDocumentPipWindow(pip) {
     doc.addEventListener('mousemove', resetHideTimer);
     resetHideTimer();
 
-    // 2. Fullscreen / Window Maximization
-    let isMaximized = false;
-    let origBounds = {
-        x: pip.screenX || 100,
-        y: pip.screenY || 100,
-        w: pip.outerWidth || 640,
-        h: pip.outerHeight || 640
-    };
+    // 2. Fullscreen / Transition to Dedicated True Fullscreen Patch Window
+    function switchToFullscreenPatch() {
+        const s = pip.screen || window.screen;
+        const targetX = s ? (s.availLeft !== undefined ? s.availLeft : (s.left || 0)) : 0;
+        const targetY = s ? (s.availTop !== undefined ? s.availTop : (s.top || 0)) : 0;
+        const targetW = s ? (s.availWidth || s.width || 1920) : 1920;
+        const targetH = s ? (s.availHeight || s.height || 1080) : 1080;
 
-    function toggleFullscreen() {
-        const btnFs = doc.getElementById('btn-fs');
-        if (!isMaximized) {
-            origBounds = {
-                x: pip.screenX || 100,
-                y: pip.screenY || 100,
-                w: pip.outerWidth || 640,
-                h: pip.outerHeight || 640
-            };
-            isMaximized = true;
-
-            // Attempt browser standard requestFullscreen
-            if (doc.documentElement.requestFullscreen) {
-                doc.documentElement.requestFullscreen().catch(() => {});
-            }
-
-            // Maximize PiP window to fill monitor display area
-            try {
-                const s = pip.screen;
-                const targetX = s.availLeft !== undefined ? s.availLeft : (s.left || 0);
-                const targetY = s.availTop !== undefined ? s.availTop : (s.top || 0);
-                const targetW = s.availWidth || s.width;
-                const targetH = s.availHeight || s.height;
-                pip.moveTo(targetX, targetY);
-                pip.resizeTo(targetW, targetH);
-            } catch (e) {
-                console.warn("Maximize PiP window note:", e);
-            }
-
-            if (btnFs) btnFs.innerText = currentLang === 'en' ? 'Exit Fullscreen [F]' : '退出全屏 [F]';
-        } else {
-            isMaximized = false;
-            if (doc.fullscreenElement && doc.exitFullscreen) {
-                doc.exitFullscreen().catch(() => {});
-            }
-            try {
-                pip.moveTo(origBounds.x, origBounds.y);
-                pip.resizeTo(origBounds.w, origBounds.h);
-            } catch (e) {
-                console.warn("Restore PiP window note:", e);
-            }
-            if (btnFs) btnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
+        // Open dedicated fullscreen window on target display
+        const win = window.open(
+            '/patch?autofs=1',
+            'TVPatchFullscreenWindow',
+            `left=${targetX},top=${targetY},width=${targetW},height=${targetH},menubar=no,toolbar=no,location=no,status=no`
+        );
+        if (win) {
+            win.focus();
         }
+        // Close PiP window so there is only one active patch target
+        try {
+            pip.close();
+        } catch (e) {}
     }
 
     // 3. Cycle Patch Size (10% -> 20% -> 50% -> 100% Fullscreen)
@@ -1655,7 +1626,10 @@ function setupDocumentPipWindow(pip) {
 
     // Hook up button clicks
     const btnFs = doc.getElementById('btn-fs');
-    if (btnFs) btnFs.onclick = toggleFullscreen;
+    if (btnFs) {
+        btnFs.onclick = switchToFullscreenPatch;
+        btnFs.title = currentLang === 'en' ? 'Switch to True Fullscreen window [F]' : '切换为 100% 独立全屏测色靶窗 [F]';
+    }
 
     const btnSize = doc.getElementById('btn-size');
     if (btnSize) btnSize.onclick = cycleSize;
@@ -1669,14 +1643,14 @@ function setupDocumentPipWindow(pip) {
     const btnReset = doc.getElementById('btn-reset');
     if (btnReset) btnReset.onclick = setStandbyMode;
 
-    // Double-click on background toggles fullscreen
+    // Double-click on background switches to True Fullscreen
     const container = doc.getElementById('container');
-    if (container) container.ondblclick = toggleFullscreen;
+    if (container) container.ondblclick = switchToFullscreenPatch;
 
     // Keyboard Shortcuts inside PiP window
     pip.addEventListener('keydown', (e) => {
         const k = e.key.toLowerCase();
-        if (k === 'f') toggleFullscreen();
+        if (k === 'f') switchToFullscreenPatch();
         else if (k === 's') cycleSize();
         else if (k === 'h') toggleCrosshair();
         else if (k === 'b') toggleBackground();
@@ -1684,7 +1658,6 @@ function setupDocumentPipWindow(pip) {
         else if (k === 'escape') {
             const overlay = doc.getElementById('complete-overlay');
             if (overlay) overlay.classList.remove('active');
-            if (isMaximized) toggleFullscreen();
         }
     });
 
@@ -1894,6 +1867,34 @@ async function toggleTVPatchWindow() {
 // Backward compatibility alias so any legacy calls work seamlessly
 function openTVPatchWindow() {
     toggleTVPatchWindow();
+}
+
+function openFullscreenPatchWindow() {
+    if (activeDocPipWindow) {
+        try { activeDocPipWindow.close(); } catch (e) {}
+        activeDocPipWindow = null;
+        updatePatchButtonState(false);
+    }
+    if (document.pictureInPictureElement) {
+        try { document.exitPictureInPicture(); } catch (e) {}
+        updatePatchButtonState(false);
+    }
+
+    const s = window.screen;
+    const targetW = s ? (s.availWidth || 1920) : 1920;
+    const targetH = s ? (s.availHeight || 1080) : 1080;
+    const targetX = s ? (s.availLeft !== undefined ? s.availLeft : 0) : 0;
+    const targetY = s ? (s.availTop !== undefined ? s.availTop : 0) : 0;
+
+    const win = window.open(
+        '/patch?autofs=1',
+        'TVPatchFullscreenWindow',
+        `left=${targetX},top=${targetY},width=${targetW},height=${targetH},menubar=no,toolbar=no,location=no,status=no`
+    );
+    if (win) {
+        win.focus();
+    }
+    return win;
 }
 
 function exportCSV() {
