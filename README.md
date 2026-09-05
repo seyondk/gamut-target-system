@@ -39,7 +39,8 @@
   - 自动计算 CIE 1976 UCS 感知均匀色度差 $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$。
   - 自动对实测色偏 $\Delta xy > 0.006$ 的点位进行醒目高亮警示。
 - **外接电视专用独立测色靶窗 (`/patch`) 与 强制置顶功能 (Always on Top)**：
-  - **系统级强制置顶 (Always on Top / PiP)**：集成 W3C Document Picture-in-Picture API，点击工具栏 `[📌 强制置顶]` 或快捷键 **`[T]`**，即可将靶窗提升为操作系统原生最高层级的独立悬浮窗（置顶于所有桌面应用之上）；主控制台提供 **`[📌 打开置顶靶窗]`** 一键直达入口。
+  - **单键唤起系统级强制置顶 (Always on Top / 画中画)**：主控制台提供统一单键 **`[打开测色靶窗]`**，点击即刻以操作系统最高层级原生置顶悬浮窗运行（始终悬浮于所有桌面软件与窗口之上，绝不下沉被遮挡）。
+  - **双引擎通用置顶技术架构 (Safari / Chrome / Edge 通用)**：集成标准视频画中画（Video Canvas PiP，与视频网站完全一致的原生置顶机制，全浏览器兼容）与 Chromium Document PiP，在 macOS Safari 与 Chrome 下均可实现 100% 稳定的“一直置顶”；控制台配备专属靶窗尺寸快捷切换（10%、20%、50%、100%）。
   - **防息屏保持 (Screen Wake Lock)**：置顶运行期间自动启用屏幕唤醒锁，防止测试过程中电视或显示器意外息屏休眠。
   - **全黑防灼屏待机模式**：初始无色彩方块输出，仅显示中央定位准星，防止长时间静止高亮图像导致 OLED 灼屏。
   - **完整键盘快捷键体系**：
@@ -131,7 +132,8 @@ The system communicates directly with hardware colorimeters (**Calibrite / X-Rit
   - Calculates CIE 1976 UCS distance: $\Delta u'v' = \sqrt{(u'_m - u'_t)^2 + (v'_m - v'_t)^2}$.
   - Highlights test points in warning red whenever $\Delta xy > 0.006$.
 - **Dedicated External TV Target Window (`/patch`) with Always-on-Top (PiP)**:
-  - **Native OS Always-on-Top (PiP)**: Built-in W3C Document Picture-in-Picture API enables true OS-level always-on-top floating patch window above all desktop applications with one click `[📌 Always on Top]` or hotkey **`[T]`**; quick launch button `[📌 Open Pinned Patch]` on the main dashboard.
+  - **Single-Button Launch with True Always-on-Top**: Unified single header button **`[Open Target Patch]`** immediately pops up an OS-level always-on-top floating window above all desktop applications, ensuring it never drops behind the console.
+  - **Dual-Engine Universal PiP (Safari / Chrome / Edge Universal)**: Integrates standard Video Canvas Picture-in-Picture (identical to native video site PiP mechanisms, universally compatible across macOS Safari & Chrome) and Chromium Document PiP, with live canvas streaming and patch size presets (10%, 20%, 50%, 100%).
   - **Screen Wake Lock**: Automatically maintains display wakefulness during calibration to prevent unexpected screen dimming or sleep.
   - **Pure-Black Standby Mode**: Default zero-luminance background with high-visibility center crosshair and alignment ring, preventing OLED panel burn-in.
   - **Keyboard Shortcut System**:

@@ -23,7 +23,11 @@ const I18N = {
         meter_missing: "未检测到物理探头",
         val_btn: "标准原色校准验证",
         tv_window_btn: "打开测色靶窗",
-        tv_window_top_btn: "📌 打开置顶靶窗",
+        tv_window_btn_pinned: "✓ 测色靶窗置顶中 (点击退出)",
+        patch_size_10: "靶窗: 10% 面积",
+        patch_size_20: "靶窗: 20% (标准)",
+        patch_size_50: "靶窗: 50% 面积",
+        patch_size_100: "靶窗: 100% 铺满",
         export_csv_btn: "导出 CSV",
         export_png_btn: "导出 4K PNG",
         export_svg_btn: "导出矢量图 (SVG)",
@@ -120,7 +124,11 @@ const I18N = {
         meter_missing: "Colorimeter Disconnected",
         val_btn: "Primary Calibration Validation",
         tv_window_btn: "Open Target Patch",
-        tv_window_top_btn: "📌 Open Pinned Patch",
+        tv_window_btn_pinned: "✓ Target Patch Pinned (Click to exit)",
+        patch_size_10: "Patch: 10% Area",
+        patch_size_20: "Patch: 20% (Standard)",
+        patch_size_50: "Patch: 50% Area",
+        patch_size_100: "Patch: 100% Fullscreen",
         export_csv_btn: "Export CSV",
         export_png_btn: "Export 4K PNG",
         export_svg_btn: "Export Vector (SVG)",
@@ -305,6 +313,18 @@ function applyTranslations() {
         selContainer.options[1].text = currentLang === 'en' ? 'BT.2020 (Recommended/Wide Gamut)' : 'BT.2020 (推荐/广色域)';
     }
 
+    const selPatchSize = document.getElementById('select-patch-size');
+    if (selPatchSize && selPatchSize.options.length >= 4) {
+        selPatchSize.options[0].text = t('patch_size_10');
+        selPatchSize.options[1].text = t('patch_size_20');
+        selPatchSize.options[2].text = t('patch_size_50');
+        selPatchSize.options[3].text = t('patch_size_100');
+    }
+
+    updatePatchButtonState();
+    renderTargetCanvas();
+    updateDocPipDOM();
+
     // Update meter status
     updateMeterDisplay();
 
@@ -460,6 +480,11 @@ function handleServerEvent(msg) {
                 btnAll.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>${t('btn_measure_all', '一键自动测量全套坐标')}</span>`;
             }
             playCompletionChime();
+            triggerPatchCompletion(
+                currentLang === 'en' ? 'Test Cycle Completed!' : '全套点位测试已完成！',
+                'ALL TARGET POINTS MEASURED',
+                currentLang === 'en' ? `All ${msg.total_points || 15} points measured successfully.` : `全套 ${msg.total_points || 15} 个坐标点位光学采样已全部完成`
+            );
             const doneMsg = currentLang === 'en' ? 
                 `🎉 All ${msg.total_points || 15} coordinates measured successfully!\nData updated and TV patch window completed flashing notification.` :
                 `🎉 全套 ${msg.total_points || 15} 个坐标点位测量已全部完成！\n实测数据与判定已同步更新，电视靶窗已同步完成发光提醒与复位。`;
@@ -482,6 +507,11 @@ function handleServerEvent(msg) {
                 valBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> ${t('val_all_btn', '一键全测标准原色 (7色)')}`;
             }
             playCompletionChime();
+            triggerPatchCompletion(
+                currentLang === 'en' ? 'Validation Completed!' : '标准原色校准验证完成！',
+                'CALIBRATION VALIDATION COMPLETED',
+                currentLang === 'en' ? 'All 7 reference primaries verified.' : '7 项标准原色光学采样全部完成'
+            );
             document.getElementById('val-progress-text').innerText = currentLang === 'en' ? 'Primary validation completed!' : '全套标准原色校准验证完成！';
             break;
 
@@ -510,6 +540,11 @@ function handleServerEvent(msg) {
 
         case 'PATCH_DISPLAY':
             selectPoint(msg.patch.point_id, false);
+            updateTargetPatchDisplay(msg.patch);
+            break;
+
+        case 'STANDBY_MODE':
+            updateTargetPatchDisplay(null, true);
             break;
 
         case 'MEASURE_ERROR':
@@ -744,6 +779,19 @@ function selectPoint(pointId, updateTV = true) {
         }
         if (updateTV) {
             displayOnTV(pointId);
+        }
+        const pt = appState.points.find(p => p.id === pointId);
+        if (pt) {
+            updateTargetPatchDisplay({
+                point_id: pt.id,
+                name: pt.name,
+                target_x: pt.target_x,
+                target_y: pt.target_y,
+                rgb: pt.rgb,
+                container: appState.settings?.container_space || 'bt2020',
+                is_clipped: pt.is_clipped,
+                hdr_mode: appState.settings?.hdr_mode
+            });
         }
     }
 }
@@ -1105,9 +1153,493 @@ async function toggleFlareComp() {
     });
 }
 
-function openTVPatchWindow(pinned = false) {
-    const url = pinned ? '/patch?pin=1' : '/patch';
-    window.open(url, 'TVPatchWindow', 'width=960,height=600,menubar=no,toolbar=no,location=no,status=no');
+// ==========================================
+// Always-on-Top Target Patch Window Pipeline
+// Supports Document PiP (Chromium) & Universal Video Canvas PiP (Safari/Firefox/All)
+// ==========================================
+
+let activeDocPipWindow = null;
+let pipStream = null;
+let currentTargetPatch = null;
+let patchDisplayOptions = {
+    size: 'patch-20',
+    bg: '#000000',
+    crosshair: true,
+    flashActive: false,
+    completeBanner: null
+};
+
+function isPatchPinned() {
+    return !!(activeDocPipWindow || document.pictureInPictureElement);
+}
+
+function updatePatchButtonState(isPinned = null) {
+    if (isPinned === null) {
+        isPinned = isPatchPinned();
+    }
+    const btn = document.getElementById('btn-open-patch');
+    const lbl = document.getElementById('lbl-open-patch');
+    if (!btn || !lbl) return;
+
+    if (isPinned) {
+        btn.classList.add('btn-pinned');
+        lbl.innerText = t('tv_window_btn_pinned', '✓ 测色靶窗置顶中 (点击退出)');
+        btn.title = currentLang === 'en' ? 'Target patch is pinned on top. Click to close.' : '测色靶窗正以系统最高层级置顶悬浮运行，点击可退出悬浮。';
+    } else {
+        btn.classList.remove('btn-pinned');
+        lbl.innerText = t('tv_window_btn', '打开测色靶窗');
+        btn.title = currentLang === 'en' ? 'Open Always-on-Top target patch window' : '打开独立测色靶窗 (系统最高层级强制置顶悬浮，始终位于所有窗口与软件之上)';
+    }
+}
+
+function changePatchSize(newSize) {
+    patchDisplayOptions.size = newSize;
+    updateTargetPatchDisplay(currentTargetPatch);
+}
+
+function renderTargetCanvas() {
+    const canvas = document.getElementById('patch-pip-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // 1. Fill Background
+    ctx.fillStyle = patchDisplayOptions.bg || '#000000';
+    ctx.fillRect(0, 0, w, h);
+
+    const p = currentTargetPatch;
+
+    // 2. Render Patch Color Box (if active)
+    if (p && !p.is_standby) {
+        let sizeRatio = 0.447; // default patch-20
+        if (patchDisplayOptions.size === 'patch-10') sizeRatio = 0.316;
+        else if (patchDisplayOptions.size === 'patch-50') sizeRatio = 0.707;
+        else if (patchDisplayOptions.size === 'patch-100') sizeRatio = 1.0;
+
+        const boxW = Math.round(w * sizeRatio);
+        const boxH = Math.round(h * sizeRatio);
+        const bx = Math.round((w - boxW) / 2);
+        const by = Math.round((h - boxH) / 2);
+
+        const r = (p.rgb && p.rgb[0] !== undefined) ? Math.round(p.rgb[0] * 255) : 0;
+        const g = (p.rgb && p.rgb[1] !== undefined) ? Math.round(p.rgb[1] * 255) : 0;
+        const b = (p.rgb && p.rgb[2] !== undefined) ? Math.round(p.rgb[2] * 255) : 0;
+
+        if (p.is_black) {
+            ctx.fillStyle = '#000000';
+        } else {
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        }
+        ctx.fillRect(bx, by, boxW, boxH);
+    }
+
+    // 3. Render Probe Alignment Crosshair (if enabled or in standby)
+    const showCrosshair = patchDisplayOptions.crosshair !== false;
+    if (showCrosshair || !p || p.is_standby) {
+        ctx.save();
+        const ringR = 120;
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 6]);
+        ctx.stroke();
+
+        // Crosshair ticks
+        ctx.setLineDash([]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 30, cy); ctx.lineTo(cx + 30, cy);
+        ctx.moveTo(cx, cy - 30); ctx.lineTo(cx, cy + 30);
+        ctx.stroke();
+
+        // Center dot
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+
+        // Label Pill
+        const labelText = (!p || p.is_standby) ? 
+            (currentLang === 'en' ? "Probe Alignment Target (Standby)" : "探头校色对准框 (待机定位模式)") :
+            `${p.name || ('P' + p.point_id)} - (${(p.target_x||0).toFixed(4)}, ${(p.target_y||0).toFixed(4)})`;
+
+        ctx.font = '600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        const textWidth = ctx.measureText(labelText).width;
+        const pillW = textWidth + 28;
+        const pillH = 32;
+        const pillX = cx - pillW / 2;
+        const pillY = cy + ringR + 14;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(pillX, pillY, pillW, pillH, 8);
+        } else {
+            ctx.rect(pillX, pillY, pillW, pillH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, cx, pillY + pillH / 2);
+
+        if (!p || p.is_standby) {
+            const subText = currentLang === 'en' ? "Awaiting command · Align probe to center ring" : "等待测色指令 · 请将探头贴合对准中央框线";
+            ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+            ctx.fillText(subText, cx, pillY + pillH + 20);
+        } else if (p.rgb) {
+            const rgbText = `RGB: [${Math.round(p.rgb[0]*255)}, ${Math.round(p.rgb[1]*255)}, ${Math.round(p.rgb[2]*255)}] · ${p.container?.toUpperCase() || 'BT2020'}`;
+            ctx.font = '13px SF Mono, Menlo, monospace';
+            ctx.fillStyle = 'rgba(248, 250, 252, 0.9)';
+            ctx.fillText(rgbText, cx, pillY + pillH + 20);
+        }
+
+        ctx.restore();
+    }
+
+    // 4. Dedicated Flashing Green Edge Overlay
+    if (patchDisplayOptions.flashActive) {
+        ctx.save();
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+        ctx.strokeRect(10, 10, w - 20, h - 20);
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = '#34d399';
+        ctx.strokeRect(20, 20, w - 40, h - 40);
+        ctx.restore();
+    }
+
+    // 5. Completion Banner Overlay
+    if (patchDisplayOptions.completeBanner) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(0, 0, w, h);
+
+        const cardW = 500;
+        const cardH = 220;
+        const cardX = (w - cardW) / 2;
+        const cardY = (h - cardH) / 2;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+        } else {
+            ctx.rect(cardX, cardY, cardW, cardH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        // Icon check
+        ctx.beginPath();
+        ctx.arc(cx, cardY + 45, 24, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = '700 22px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#10b981';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✓', cx, cardY + 45);
+
+        // Title
+        ctx.font = '700 18px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText(patchDisplayOptions.completeBanner.title || '测试已完成', cx, cardY + 95);
+
+        // Subtitle
+        ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText(patchDisplayOptions.completeBanner.sub || '', cx, cardY + 130);
+
+        // Desc
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(patchDisplayOptions.completeBanner.desc || '', cx, cardY + 165);
+
+        ctx.restore();
+    }
+}
+
+function setupDocumentPipWindow(pip) {
+    const doc = pip.document;
+    doc.title = `${t('tv_window_btn', '测色靶窗')} - Always on Top`;
+    doc.body.style.margin = '0';
+    doc.body.style.padding = '0';
+    doc.body.style.background = '#000000';
+    doc.body.style.overflow = 'hidden';
+    doc.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    doc.body.style.color = '#ffffff';
+
+    doc.body.innerHTML = `
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+            #doc-container {
+                position: relative; width: 100vw; height: 100vh;
+                display: flex; align-items: center; justify-content: center;
+                background-color: #000000; transition: background-color 0.2s;
+            }
+            #doc-patch {
+                position: absolute; display: flex; align-items: center; justify-content: center;
+                background-color: transparent; opacity: 0; transition: opacity 0.25s, width 0.25s, height 0.25s;
+            }
+            #doc-patch.active-color { opacity: 1; }
+            .patch-10 { width: 31.6vw; height: 31.6vh; }
+            .patch-20 { width: 44.7vw; height: 44.7vh; }
+            .patch-50 { width: 70.7vw; height: 70.7vh; }
+            .patch-100 { width: 100vw; height: 100vh; }
+            #doc-crosshair {
+                position: absolute; width: 120px; height: 120px;
+                border: 2px dashed rgba(56, 189, 248, 0.85); border-radius: 50%;
+                pointer-events: none; display: flex; align-items: center; justify-content: center;
+                z-index: 50; box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
+            }
+            #doc-crosshair::before, #doc-crosshair::after { content: ''; position: absolute; background: rgba(56, 189, 248, 0.85); }
+            #doc-crosshair::before { width: 28px; height: 2px; }
+            #doc-crosshair::after { width: 2px; height: 28px; }
+            .crosshair-dot { width: 4px; height: 4px; background: #38bdf8; border-radius: 50%; }
+            .crosshair-label {
+                position: absolute; bottom: -32px; font-size: 11px; font-weight: 500; color: #38bdf8;
+                white-space: nowrap; background: rgba(15, 23, 42, 0.85); padding: 3px 8px;
+                border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.35);
+            }
+            #doc-hud {
+                position: fixed; top: 12px; left: 12px;
+                background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px);
+                border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px;
+                padding: 8px 12px; font-size: 11px; color: #e2e8f0; z-index: 100;
+            }
+            #doc-flash {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                pointer-events: none; z-index: 9000; opacity: 0;
+                box-shadow: inset 0 0 160px 50px #10b981; transition: opacity 0.2s;
+            }
+            #doc-toolbar {
+                position: fixed; bottom: 10px; display: flex; gap: 6px;
+                background: rgba(15, 23, 42, 0.85); border-radius: 6px; padding: 6px 10px;
+                border: 1px solid rgba(255, 255, 255, 0.15); z-index: 100;
+            }
+            .pip-btn {
+                background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+                padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
+            }
+            .pip-btn:hover { background: #0284c7; border-color: #38bdf8; }
+        </style>
+        <div id="doc-flash"></div>
+        <div id="doc-container">
+            <div id="doc-patch" class="${patchDisplayOptions.size || 'patch-20'}"></div>
+            <div id="doc-crosshair">
+                <div class="crosshair-dot"></div>
+                <span class="crosshair-label" id="doc-crosshair-lbl">${currentLang === 'en' ? 'Probe Alignment Target' : '探头校色对准框'}</span>
+            </div>
+        </div>
+        <div id="doc-hud">
+            <div style="font-weight:700; color:#38bdf8; margin-bottom:3px;" id="doc-hud-title">${currentLang === 'en' ? 'Target Patch · Always on Top' : '测色靶窗 · 强制置顶'}</div>
+            <div>点位: <strong id="doc-hud-pt">待机定位模式</strong> | RGB: <span id="doc-hud-rgb" style="font-family:monospace;">--</span></div>
+        </div>
+        <div id="doc-toolbar">
+            <button class="pip-btn" id="doc-btn-size">尺寸 (20%)</button>
+            <button class="pip-btn" id="doc-btn-bg">黑/灰</button>
+            <button class="pip-btn" id="doc-btn-h">准星</button>
+        </div>
+    `;
+
+    const btnSize = doc.getElementById('doc-btn-size');
+    if (btnSize) {
+        btnSize.onclick = () => {
+            const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+            const curIdx = sizes.indexOf(patchDisplayOptions.size || 'patch-20');
+            const nextSize = sizes[(curIdx + 1) % sizes.length];
+            changePatchSize(nextSize);
+            const sel = document.getElementById('select-patch-size');
+            if (sel) sel.value = nextSize;
+            btnSize.innerText = `尺寸 (${nextSize.replace('patch-', '')}%)`;
+        };
+    }
+
+    const btnBg = doc.getElementById('doc-btn-bg');
+    if (btnBg) {
+        btnBg.onclick = () => {
+            patchDisplayOptions.bg = patchDisplayOptions.bg === '#000000' ? '#2e2e2e' : '#000000';
+            const cont = doc.getElementById('doc-container');
+            if (cont) cont.style.backgroundColor = patchDisplayOptions.bg;
+            renderTargetCanvas();
+        };
+    }
+
+    const btnH = doc.getElementById('doc-btn-h');
+    if (btnH) {
+        btnH.onclick = () => {
+            patchDisplayOptions.crosshair = !patchDisplayOptions.crosshair;
+            const ch = doc.getElementById('doc-crosshair');
+            if (ch) ch.style.display = patchDisplayOptions.crosshair ? 'flex' : 'none';
+            renderTargetCanvas();
+        };
+    }
+
+    pip.addEventListener('pagehide', () => {
+        activeDocPipWindow = null;
+        updatePatchButtonState(false);
+    });
+
+    updateDocPipDOM();
+}
+
+function updateDocPipDOM() {
+    if (!activeDocPipWindow || !activeDocPipWindow.document) return;
+    const doc = activeDocPipWindow.document;
+    const patchEl = doc.getElementById('doc-patch');
+    const hudPt = doc.getElementById('doc-hud-pt');
+    const hudRgb = doc.getElementById('doc-hud-rgb');
+    const chLabel = doc.getElementById('doc-crosshair-lbl');
+    const container = doc.getElementById('doc-container');
+    if (!patchEl) return;
+
+    const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+    sizes.forEach(s => patchEl.classList.remove(s));
+    patchEl.classList.add(patchDisplayOptions.size || 'patch-20');
+
+    if (container) container.style.backgroundColor = patchDisplayOptions.bg || '#000000';
+
+    const p = currentTargetPatch;
+    if (!p || p.is_standby) {
+        patchEl.classList.remove('active-color');
+        patchEl.style.backgroundColor = 'transparent';
+        if (hudPt) hudPt.innerText = currentLang === 'en' ? 'Standby (Align Probe)' : '待机定位 (探头对准中央)';
+        if (hudRgb) hudRgb.innerText = '--';
+        if (chLabel) chLabel.innerText = currentLang === 'en' ? 'Probe Alignment Target' : '探头校色对准框';
+    } else {
+        patchEl.classList.add('active-color');
+        const r = (p.rgb && p.rgb[0] !== undefined) ? p.rgb[0] : 0;
+        const g = (p.rgb && p.rgb[1] !== undefined) ? p.rgb[1] : 0;
+        const b = (p.rgb && p.rgb[2] !== undefined) ? p.rgb[2] : 0;
+
+        if (p.is_black) {
+            patchEl.style.backgroundColor = '#000000';
+        } else if (p.container === 'bt2020' || p.container === 'native') {
+            patchEl.style.backgroundColor = `color(rec2020 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
+        } else if (p.container === 'p3') {
+            patchEl.style.backgroundColor = `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
+        } else {
+            patchEl.style.backgroundColor = `rgb(${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)})`;
+        }
+
+        if (hudPt) hudPt.innerText = `${p.name || ('P' + p.point_id)} (${(p.target_x||0).toFixed(4)}, ${(p.target_y||0).toFixed(4)})`;
+        if (hudRgb) hudRgb.innerText = `${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)}`;
+        if (chLabel) chLabel.innerText = `${p.name || ('P' + p.point_id)}`;
+    }
+}
+
+function updateTargetPatchDisplay(patchData, isStandby = false) {
+    if (isStandby || !patchData) {
+        currentTargetPatch = null;
+    } else {
+        currentTargetPatch = patchData;
+    }
+    renderTargetCanvas();
+    updateDocPipDOM();
+}
+
+let patchCompleteTimer = null;
+function triggerPatchCompletion(title, sub, desc) {
+    playCompletionChime();
+    patchDisplayOptions.flashActive = true;
+    patchDisplayOptions.completeBanner = { title, sub, desc };
+    updateTargetPatchDisplay(null, true);
+
+    if (activeDocPipWindow && activeDocPipWindow.document) {
+        const flash = activeDocPipWindow.document.getElementById('doc-flash');
+        if (flash) {
+            flash.style.opacity = '1';
+            setTimeout(() => { if (flash) flash.style.opacity = '0'; }, 2200);
+        }
+    }
+
+    renderTargetCanvas();
+
+    clearTimeout(patchCompleteTimer);
+    patchCompleteTimer = setTimeout(() => {
+        patchDisplayOptions.flashActive = false;
+        patchDisplayOptions.completeBanner = null;
+        renderTargetCanvas();
+    }, 4500);
+}
+
+async function toggleTVPatchWindow() {
+    // 1. If currently active -> Close cleanly
+    if (activeDocPipWindow) {
+        try { activeDocPipWindow.close(); } catch(e){}
+        activeDocPipWindow = null;
+        updatePatchButtonState(false);
+        return;
+    }
+    if (document.pictureInPictureElement) {
+        try { await document.exitPictureInPicture(); } catch(e){}
+        updatePatchButtonState(false);
+        return;
+    }
+
+    // 2. Strategy 1: Document Picture-in-Picture (Chromium 116+)
+    if ('documentPictureInPicture' in window) {
+        try {
+            const pip = await window.documentPictureInPicture.requestWindow({
+                width: 560,
+                height: 560,
+                disallowReturnToOpener: false
+            });
+            activeDocPipWindow = pip;
+            setupDocumentPipWindow(pip);
+            updatePatchButtonState(true);
+            return;
+        } catch (err) {
+            console.warn("Document PiP request rejected or failed, falling back to Video Canvas PiP:", err);
+        }
+    }
+
+    // 3. Strategy 2: Universal Video Canvas PiP (Safari, Firefox, Chrome universal always-on-top)
+    const pipVideo = document.getElementById('patch-pip-video');
+    const pipCanvas = document.getElementById('patch-pip-canvas');
+    if (pipVideo && pipCanvas) {
+        try {
+            renderTargetCanvas();
+            if (!pipStream) {
+                pipStream = pipCanvas.captureStream(30);
+                pipVideo.srcObject = pipStream;
+            }
+            await pipVideo.play();
+            await pipVideo.requestPictureInPicture();
+            updatePatchButtonState(true);
+
+            pipVideo.addEventListener('leavepictureinpicture', () => {
+                updatePatchButtonState(false);
+            }, { once: true });
+            return;
+        } catch (err) {
+            console.warn("Video Canvas PiP failed, falling back to popup window:", err);
+        }
+    }
+
+    // 4. Strategy 3: Standard Pop-up Window Fallback
+    window.open('/patch', 'TVPatchWindow', 'width=800,height=800,menubar=no,toolbar=no,location=no,status=no');
+}
+
+// Backward compatibility alias so any legacy calls work seamlessly
+function openTVPatchWindow() {
+    toggleTVPatchWindow();
 }
 
 function exportCSV() {

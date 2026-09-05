@@ -383,8 +383,11 @@
             color: #64748b;
         }
     </style>
-</head>
 <body>
+    <!-- Native Always-on-Top Video Canvas Picture-in-Picture Pipeline -->
+    <canvas id="patch-pip-canvas" width="700" height="700" style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;z-index:-1000;"></canvas>
+    <video id="patch-pip-video" playsinline muted autoplay style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;z-index:-1000;"></video>
+
     <!-- Screen Edge Pulse Flash Overlay -->
     <div id="flash-overlay"></div>
 
@@ -961,11 +964,122 @@
                 }
             }
 
-            // 4. Fallback: Aggressive keep-focused mode + Wake Lock
+            // 4. Universal Video Canvas PiP (Safari, Firefox, Chrome universal always-on-top)
+            const pipVideo = document.getElementById('patch-pip-video');
+            const pipCanvas = document.getElementById('patch-pip-canvas');
+            if (pipVideo && pipCanvas) {
+                try {
+                    renderCanvasFrame();
+                    if (!pipStream) {
+                        pipStream = pipCanvas.captureStream(30);
+                        pipVideo.srcObject = pipStream;
+                    }
+                    await pipVideo.play();
+                    await pipVideo.requestPictureInPicture();
+                    requestScreenWakeLock();
+                    updatePinUI(true);
+
+                    pipVideo.addEventListener('leavepictureinpicture', () => {
+                        updatePinUI(false);
+                        releaseScreenWakeLock();
+                    }, { once: true });
+                    return;
+                } catch (err) {
+                    console.warn("Video Canvas PiP failed:", err);
+                }
+            }
+
+            // 5. Fallback: Aggressive keep-focused mode + Wake Lock
             isSoftwarePinned = true;
             requestScreenWakeLock();
             window.focus();
             updatePinUI(true);
+        }
+
+        let pipStream = null;
+        function renderCanvasFrame() {
+            const canvas = document.getElementById('patch-pip-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            // Background
+            ctx.fillStyle = container.style.backgroundColor || '#000000';
+            ctx.fillRect(0, 0, w, h);
+
+            // Active patch
+            if (patch.classList.contains('active-color')) {
+                let sizeRatio = 0.447;
+                if (currentSize === 'patch-10') sizeRatio = 0.316;
+                else if (currentSize === 'patch-50') sizeRatio = 0.707;
+                else if (currentSize === 'patch-100') sizeRatio = 1.0;
+
+                const boxW = Math.round(w * sizeRatio);
+                const boxH = Math.round(h * sizeRatio);
+                const bx = Math.round((w - boxW) / 2);
+                const by = Math.round((h - boxH) / 2);
+
+                ctx.fillStyle = patch.style.backgroundColor || '#000000';
+                ctx.fillRect(bx, by, boxW, boxH);
+            }
+
+            // Alignment Crosshair (if not hidden)
+            if (!document.body.classList.contains('hide-target')) {
+                ctx.save();
+                const ringR = 120;
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([8, 6]);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cx - 30, cy); ctx.lineTo(cx + 30, cy);
+                ctx.moveTo(cx, cy - 30); ctx.lineTo(cx, cy + 30);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fill();
+
+                const ptText = document.getElementById('hud-point')?.innerText || '待机定位模式';
+                ctx.font = '600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                const textWidth = ctx.measureText(ptText).width;
+                const pillW = textWidth + 28;
+                const pillH = 32;
+                const pillX = cx - pillW / 2;
+                const pillY = cy + ringR + 14;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(pillX, pillY, pillW, pillH, 8);
+                else ctx.rect(pillX, pillY, pillW, pillH);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ptText, cx, pillY + pillH / 2);
+
+                const rgbVal = document.getElementById('hud-rgb')?.innerText;
+                if (rgbVal && rgbVal !== '--') {
+                    ctx.font = '13px SF Mono, Menlo, monospace';
+                    ctx.fillStyle = 'rgba(248, 250, 252, 0.9)';
+                    ctx.fillText(`RGB: ${rgbVal}`, cx, pillY + pillH + 20);
+                }
+
+                ctx.restore();
+            }
         }
 
         window.addEventListener('blur', () => {

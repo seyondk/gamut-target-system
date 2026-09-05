@@ -242,6 +242,13 @@
             background: #b91c1c;
         }
 
+        .btn-pinned {
+            background: #0284c7 !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.6) !important;
+        }
+
         .btn-sm {
             height: 32px;
             padding: 0 10px;
@@ -768,22 +775,21 @@
                 <span data-i18n="val_btn">标准原色校准验证</span>
             </button>
 
-            <!-- Launch Target Patch Window -->
-            <button class="btn" id="btn-open-patch" onclick="openTVPatchWindow()" title="打开用于给电视送信号的独立测色靶窗 (支持任意尺寸/全屏/准星定位/强制置顶)">
+            <!-- Launch Target Patch Window (Forced Always-on-Top / 强制置顶悬浮靶窗) -->
+            <button class="btn" id="btn-open-patch" onclick="toggleTVPatchWindow()" title="打开独立测色靶窗 (系统最高层级强制置顶悬浮，始终位于所有窗口与软件之上)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                     <line x1="8" y1="21" x2="16" y2="21"></line>
                     <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
-                <span data-i18n="tv_window_btn">打开测色靶窗</span>
+                <span data-i18n="tv_window_btn" id="lbl-open-patch">打开测色靶窗</span>
             </button>
-            <button class="btn" id="btn-open-patch-top" onclick="openTVPatchWindow(true)" title="打开测色靶窗并直接启动系统置顶悬浮模式 (Always on Top)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="17" x2="12" y2="22"></line>
-                    <path d="M5 17h14v-2l-2-3V6a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v6l-2 3v2z"></path>
-                </svg>
-                <span data-i18n="tv_window_top_btn">📌 打开置顶靶窗</span>
-            </button>
+            <select id="select-patch-size" onchange="changePatchSize(this.value)" title="测色靶窗显示面积尺寸" style="height:32px;">
+                <option value="patch-10" data-i18n="patch_size_10">靶窗: 10% 面积</option>
+                <option value="patch-20" selected data-i18n="patch_size_20">靶窗: 20% (标准)</option>
+                <option value="patch-50" data-i18n="patch_size_50">靶窗: 50% 面积</option>
+                <option value="patch-100" data-i18n="patch_size_100">靶窗: 100% 铺满</option>
+            </select>
 
             <!-- Export Actions -->
             <button class="btn" onclick="exportCSV()" title="导出完整测试数据为 Excel/CSV" data-i18n="export_csv_btn">
@@ -1095,8 +1101,12 @@
         </div>
     </div>
 
+    <!-- Native Always-on-Top Video Canvas Picture-in-Picture Pipeline -->
+    <canvas id="patch-pip-canvas" width="700" height="700" style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;z-index:-1000;"></canvas>
+    <video id="patch-pip-video" playsinline muted autoplay style="position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;z-index:-1000;"></video>
+
     <!-- Dependencies -->
-    <script src="/static/cie1931.js?v=7"></script>
-    <script src="/static/app.js?v=7"></script>
+    <script src="/static/cie1931.js?v=9"></script>
+    <script src="/static/app.js?v=9"></script>
 </body>
 </html>
