@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>广色域打点测试与补差分析系统 - Wide Gamut Target Testing & Offset Analysis</title>
+    <style>
+        :root {
+            --bg-primary: #0b1120;
+            --bg-secondary: #131d33;
+            --bg-tertiary: #1e293b;
+            --border: #293548;
+            --border-glow: #0284c7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-cyan: #06b6d4;
+            --accent-pink: #ec4899;
+            --accent-amber: #f59e0b;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #38bdf8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0284c7;
+        }
+
+        body {
+            zoom: 0.8;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 125vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        input[type="number"], input[type="text"] {
+            background: #090e1a;
+            border: 1px solid var(--border);
+            color: var(--accent-blue);
+            font-family: "SF Mono", Menlo, Monaco, monospace;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input[type="number"]:focus, input[type="text"]:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.3);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #1e293b;
+            border: 1px solid var(--border);
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #7dd3fc;
+        }
+
+        select {
+            background-color: #090e1a;
+            color: var(--accent-blue);
+            border: 1px solid var(--border);
+            height: 32px;
+            padding: 0 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        select:focus {
+            border-color: var(--accent-blue);
+        }
+
+        input[type="checkbox"] {
+            accent-color: var(--accent-cyan);
+            cursor: pointer;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-title h1 {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            background: var(--bg-tertiary);
+            padding: 0 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-green { background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+        .dot-yellow { background-color: var(--accent-amber); }
+        .dot-purple { background-color: #a855f7; }
+
+        /* Unified Button Heights and Padding across UI */
+        .btn {
+            background: var(--bg-tertiary);
+            color: var(--text-main);
+            border: 1px solid rgba(255,255,255,0.15);
+            height: 32px;
+            padding: 0 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+            white-space: nowrap;
+            line-height: 1;
+        }
+
+        .btn:hover {
+            background: #334155;
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .btn-primary {
+            background: #0284c7;
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: #0369a1;
+        }
+
+        .btn-success {
+            background: #059669;
+            border-color: var(--accent-green);
+            color: #ffffff;
+        }
+
+        .btn-success:hover {
+            background: #047857;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            border-color: var(--accent-red);
+            color: #ffffff;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-sm {
+            height: 32px;
+            padding: 0 10px;
+            font-size: 12px;
+        }
+
+        .btn-xs {
+            height: 24px;
+            padding: 0 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+
+        /* Fullscreen Mode for CIE Chart Card */
+        .chart-fullscreen-mode {
+            zoom: 1 !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            background: var(--bg-primary) !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        .chart-fullscreen-mode .stats-grid {
+            display: none !important;
+        }
+
+        .chart-fullscreen-mode .canvas-toolbar {
+            margin-bottom: 2px !important;
+            max-width: calc(100vh - 100px) !important;
+            width: 100% !important;
+        }
+
+        .chart-fullscreen-mode .chart-wrapper {
+            flex: 1 !important;
+            height: calc(100vh - 56px) !important;
+            max-height: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 4px 16px 10px !important;
+        }
+
+        .chart-fullscreen-mode #cie-canvas {
+            max-height: calc(100vh - 110px) !important;
+            max-width: calc(100vh - 110px) !important;
+            width: calc(100vh - 110px) !important;
+            height: calc(100vh - 110px) !important;
+        }
+
+        .chart-fullscreen-mode .chart-controls {
+            margin-top: 4px !important;
+            max-width: calc(100vh - 100px) !important;
+            padding: 4px 12px !important;
+        }
+
+        .point-color-swatch {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            border-radius: 3px;
+            vertical-align: middle;
+            margin-right: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+            flex-shrink: 0;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 580px 1fr;
+            gap: 16px;
+            padding: 16px 24px;
+            flex: 1;
+        }
+
+        @media (max-width: 1200px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-header h2 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 16px;
+            flex: 1;
+        }
+
+        .chart-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .canvas-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .zoom-btn-group {
+            display: flex;
+            gap: 4px;
+        }
+
+        #cie-canvas {
+            display: block;
+            border-radius: 6px;
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border);
+        }
+
+        .chart-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+            font-size: 12px;
+            width: 100%;
+            justify-content: center;
+            background: rgba(11, 17, 32, 0.7);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .color-tag {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        .workflow-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .black-cal-panel {
+            background: rgba(11, 17, 32, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .black-cal-info {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .black-cal-info strong {
+            color: var(--text-main);
+            font-family: "SF Mono", monospace;
+        }
+
+        .fine-tuning-bar {
+            background: rgba(19, 29, 51, 0.9);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        .offset-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .offset-inputs input[type="number"] {
+            width: 80px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            max-height: 520px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        th {
+            background: #131d33;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 8px 10px;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(41, 53, 72, 0.8);
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background-color: rgba(30, 41, 59, 0.6);
+        }
+
+        tr.selected td {
+            background-color: rgba(6, 182, 212, 0.14);
+        }
+
+        .mono {
+            font-family: "SF Mono", Menlo, Monaco, monospace;
+        }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-exceeded {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-pass {
+            background: rgba(56, 189, 248, 0.2);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+        }
+
+        .badge-inside {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .badge-pending {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--text-muted);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .stepper-input {
+            width: 78px;
+            font-size: 11px;
+            padding: 3px 4px 3px 6px;
+            box-sizing: border-box;
+            background: var(--bg-primary);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        /* Highlight Red for delta_xy > 0.006 */
+        .delta-exceeded-red {
+            color: #ef4444 !important;
+            font-weight: bold;
+            background: rgba(239, 68, 68, 0.15);
+            padding: 2px 5px;
+            border-radius: 3px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .target-edit-input {
+            width: 58px;
+            font-size: 11px;
+            padding: 2px 4px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .stat-card {
+            background: rgba(11, 17, 32, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            font-family: "SF Mono", monospace;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Modal Dialog for Custom Point Creation */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            padding: 22px;
+            width: 380px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-box h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .modal-box.modal-lg {
+            width: 760px;
+            max-width: 95vw;
+        }
+
+        .val-color-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            margin-right: 6px;
+            vertical-align: middle;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" stroke="#06b6d4"></circle>
+                <polygon points="12 4 19 18 5 18" stroke="#ec4899"></polygon>
+            </svg>
+            <h1 data-i18n="app_title">广色域打点测试与补差分析系统</h1>
+            <span class="brand-badge">CIE 1931 xy</span>
+        </div>
+
+        <div class="header-actions">
+            <!-- Language Switcher Button -->
+            <button class="btn btn-sm" id="btn-lang-toggle" onclick="toggleLanguage()" style="border-color:#38bdf8; color:#38bdf8; font-weight:600;" title="切换语言 / Switch Language">
+                🌐 EN / 中文
+            </button>
+
+            <!-- Hardware / Simulated Mode Indicator -->
+            <div class="status-pill" id="meter-status-pill">
+                <span class="dot dot-purple" id="meter-dot"></span>
+                <span id="meter-label" data-i18n="meter_checking">探头状态检查中...</span>
+            </div>
+
+            <!-- Standard Primaries & Calibration Validation -->
+            <button class="btn btn-sm" onclick="openValidationModal()" style="border-color:var(--accent-cyan); color:var(--accent-cyan);" title="测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色偏差，验证屏幕出厂校色水准与探头可靠度">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="4"></circle>
+                </svg>
+                <span data-i18n="val_btn">标准原色校准验证</span>
+            </button>
+
+            <!-- Launch TV Patch Window -->
+            <button class="btn btn-primary" onclick="openTVPatchWindow()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+                <span data-i18n="tv_window_btn">打开电视靶窗</span>
+            </button>
+
+            <!-- Export Actions -->
+            <button class="btn btn-sm" onclick="exportCSV()" title="导出完整测试数据为 Excel/CSV" data-i18n="export_csv_btn">
+                导出 CSV
+            </button>
+            <button class="btn btn-sm" onclick="exportHighResPNG()" title="导出 3000x3000 4K 高分辨率色域图 (无UI遮挡)" data-i18n="export_png_btn">
+                导出 4K PNG
+            </button>
+            <button class="btn btn-sm" onclick="exportSVG()" title="导出无限放大无损的通用矢量图 (任何浏览器可直接双击查看)" data-i18n="export_svg_btn">
+                导出矢量图 (SVG)
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main>
+        <!-- Left Panel: CIE 1931 Diagram & Gamut Switches -->
+        <section class="card" id="card-cie-chart">
+            <div class="card-header">
+                <h2>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 2 22 22 22"></polygon>
+                    </svg>
+                    CIE 1931 色度图 (缩放与拖拽视图)
+                </h2>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="btn btn-sm" id="btn-fit-gamut" onclick="chart.fitGamut()" title="聚焦填满色域 (图2样式)">聚焦色域</button>
+                    <button class="btn btn-sm" onclick="chart.resetView()" title="重置为完整全局坐标视图">复位全图</button>
+                    <button class="btn btn-sm btn-primary" id="btn-chart-fullscreen" onclick="toggleChartFullscreen()" title="全屏沉浸式放大查看色度图">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        </svg>
+                        全屏放大查看
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body chart-wrapper">
+                <!-- Canvas Toolbar with Zoom controls -->
+                <div class="canvas-toolbar">
+                    <span style="color:var(--text-muted); font-size:11px;">提示: 滚轮自由缩放，按住左键拖拽平移</span>
+                    <div class="zoom-btn-group">
+                        <button class="btn btn-sm" onclick="chart.zoomIn()" title="放大">+</button>
+                        <button class="btn btn-sm" onclick="chart.zoomOut()" title="缩小">-</button>
+                    </div>
+                </div>
+
+                <canvas id="cie-canvas"></canvas>
+
+                <!-- Gamut Reference Toggles -->
+                <div class="chart-controls">
+                    <label class="checkbox-label" title="开启/关闭马蹄形内部 CIE 真实彩色连续光谱底图">
+                        <input type="checkbox" id="chk-spectrum" checked onchange="updateGamutToggles()">
+                        <span class="color-tag" style="background: linear-gradient(135deg, #ef4444, #22c55e, #3b82f6);"></span>
+                        <strong>显示彩色底图</strong>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-p3" checked onchange="updateGamutToggles()">
+                        <span class="color-tag" style="background:#06b6d4;"></span>
+                        <strong>DCI-P3 (D65)</strong>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-bt2020" checked onchange="updateGamutToggles()">
+                        <span class="color-tag" style="background:#ec4899;"></span>
+                        <strong>BT.2020</strong>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-locus" checked onchange="updateGamutToggles()">
+                        <span class="color-tag" style="background:#94a3b8;"></span>
+                        光谱轨迹
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-labels" checked onchange="updateGamutToggles()">
+                        编号标号
+                    </label>
+                </div>
+
+                <!-- Test Statistics Overview -->
+                <div class="stats-grid" style="width: 100%;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-exceeded-count" style="color: var(--accent-green);">0 / 15</div>
+                        <div class="stat-label">超 DCI-P3 点位数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-avg-dxy">--</div>
+                        <div class="stat-label">平均偏差 Δxy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-avg-duv">--</div>
+                        <div class="stat-label">平均色差 Δu'v'</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-tested-count">0 / 15</div>
+                        <div class="stat-label">已测进度</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Workflow Controls & Points Table -->
+        <section class="card">
+            <div class="card-header">
+                <h2>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                        <line x1="9" y1="21" x2="9" y2="9"></line>
+                    </svg>
+                <h2 data-i18n="table_card_title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                        <line x1="9" y1="21" x2="9" y2="9"></line>
+                    </svg>
+                    测试坐标与测量微调分析表
+                </h2>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-sm btn-primary" onclick="openAddPointModal()" data-i18n="btn_add_point">+ 新增自定义坐标点</button>
+                    <button class="btn btn-sm" id="btn-restore-points" onclick="restoreDefaultPoints()" style="border-color:#38bdf8; color:#38bdf8;" data-i18n="btn_restore_points" title="恢复为默认的 P1-P15 测试坐标">恢复默认点位</button>
+                    <button class="btn btn-sm btn-danger" onclick="resetAllPoints()" data-i18n="btn_reset_data">重置数据</button>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <!-- Step 1: Pre-test Black Calibration & Flare Check -->
+                <div class="black-cal-panel">
+                    <div>
+                        <div style="font-weight:600; font-size:13px; margin-bottom:2px;" data-i18n="step1_title">第一步: 测前黑场校正与环境漏光自检</div>
+                        <div class="black-calInfo black-cal-info">
+                            <span data-i18n="black_y_label">基准亮度</span>: <strong id="black-y-val">未校准</strong> | 
+                            <span data-i18n="black_leak_label">漏光状态</span>: <span id="black-leakage-badge" class="badge badge-pending">待检测</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label class="checkbox-label" style="font-size:11px; color:var(--text-muted);">
+                            <input type="checkbox" id="chk-flare-comp" onchange="toggleFlareComp()">
+                            <span data-i18n="chk_flare">扣除黑场光学底噪</span>
+                        </label>
+                        <button class="btn btn-sm btn-primary" id="btn-measure-black" onclick="measureBlack()" data-i18n="btn_measure_black">
+                            一键测黑场基准
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Main Test Actions & Cadence Delay -->
+                <div class="workflow-bar">
+                    <button class="btn btn-success" id="btn-measure-all" onclick="measureAllPoints()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <span data-i18n="btn_measure_all">一键自动测量全套坐标</span>
+                    </button>
+                    
+                    <button class="btn btn-sm" onclick="measureSelectedPoint()" id="btn-measure-selected" data-i18n="btn_measure_selected">
+                        测定选中点
+                    </button>
+
+                    <!-- Cadence Delay Selector (Default 3s) -->
+                    <div style="display:flex; align-items:center; gap:5px; font-size:12px; margin-left:4px;">
+                        <span style="color:var(--text-muted);" data-i18n="cadence_label">测量间隔:</span>
+                        <select id="select-auto-delay" onchange="updateAutoDelay()">
+                            <option value="2.0">2.0 秒</option>
+                            <option value="3.0" selected>3.0 秒 (推荐)</option>
+                            <option value="4.0">4.0 秒</option>
+                            <option value="5.0">5.0 秒</option>
+                        </select>
+                    </div>
+
+                    <!-- HDR Mode Toggle -->
+                    <label class="checkbox-label" style="font-size:12px; margin-left:6px;" title="模拟/开启 HDR 10-bit BT.2020 宽动态通道">
+                        <input type="checkbox" id="chk-hdr-mode" checked onchange="toggleHDRMode()">
+                        <strong style="color:#f472b6;" data-i18n="hdr_label">HDR 模式</strong>
+                    </label>
+
+                    <!-- Container Selection (With Native Option) -->
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; margin-left:auto;">
+                        <span style="color:var(--text-muted)" data-i18n="container_label">信号容器:</span>
+                        <select id="select-container" onchange="updateContainerSpace()">
+                            <option value="native">Native 原生直通 (无截断)</option>
+                            <option value="bt2020" selected>BT.2020 (推荐/广色域)</option>
+                            <option value="p3">Display-P3</option>
+                            <option value="srgb">sRGB</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Global Offset Compensation Bar -->
+                <div class="fine-tuning-bar">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <strong data-i18n="step3_title">全局校准补差 (Global Offset):</strong>
+                        <span style="color:var(--text-muted); font-size:11px;" data-i18n="step3_desc">(补偿探头间仪器误差)</span>
+                    </div>
+                    <div class="offset-inputs">
+                        <span>Δx:</span>
+                        <input type="number" id="global-offset-x" step="0.0005" value="0.0000" onchange="applyGlobalOffset()">
+                        <span>Δy:</span>
+                        <input type="number" id="global-offset-y" step="0.0005" value="0.0000" onchange="applyGlobalOffset()">
+                        <button class="btn btn-sm" onclick="resetOffsets()" data-i18n="btn_reset_offsets">清零补差</button>
+                    </div>
+                </div>
+
+                <!-- Points Table -->
+                <div class="table-responsive">
+                    <table id="points-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 65px;" data-i18n="th_point">点位</th>
+                                <th data-i18n="th_target">需求值 (x, y)</th>
+                                <th data-i18n="th_measured">实测值 (x, y)</th>
+                                <th data-i18n="th_delta_xy">偏差 Δxy</th>
+                                <th data-i18n="th_measured_y">实测亮度 Y</th>
+                                <th data-i18n="th_offset">微调补差 (δx, δy)</th>
+                                <th data-i18n="th_delta_uv">色差 Δu'v'</th>
+                                <th data-i18n="th_rgb">RGB值</th>
+                                <th data-i18n="th_verdict">测试判定</th>
+                                <th style="text-align: right; padding-right: 14px;" data-i18n="th_actions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="points-tbody">
+                            <!-- Populated dynamically via app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Form for Adding Custom Coordinates -->
+    <div class="modal-overlay" id="modal-add-point">
+        <div class="modal-box">
+            <h3>新建自定义测试坐标点</h3>
+            <div class="form-group">
+                <label>点位名称说明:</label>
+                <input type="text" id="modal-point-name" placeholder="例如: 极限饱和红色点 / P3 边界点">
+            </div>
+            <div class="form-group" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                    <label>需求值 x (0.0 ~ 1.0):</label>
+                    <input type="number" id="modal-point-x" step="0.0001" placeholder="0.6800">
+                </div>
+                <div>
+                    <label>需求值 y (0.0 ~ 1.0):</label>
+                    <input type="number" id="modal-point-y" step="0.0001" placeholder="0.3200">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeAddPointModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitAddPoint()">保存并添加到测试</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dialog for Primary Color Calibration & Probe Validation -->
+    <div class="modal-overlay" id="modal-validation">
+        <div class="modal-box modal-lg">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                <div>
+                    <h3 style="margin-bottom:4px; font-size:16px;">🎯 标准原色校准与探头偏差验证</h3>
+                    <p style="font-size:12px; color:var(--text-muted); line-height:1.4;">
+                        测试 DCI-P3 纯正白场(D65)、RGBW 与 CMY 标准基准色。若屏幕在标准域已出厂校准且探头工作正常，此处实测偏差将极小 (Δxy ≤ 0.003)。
+                    </p>
+                </div>
+                <button class="btn btn-sm" onclick="closeValidationModal()" style="padding:2px 8px; font-size:14px;">✕</button>
+            </div>
+
+            <!-- Validation Action Controls -->
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:14px; padding:10px; background:#090e1a; border-radius:6px; border:1px solid var(--border);">
+                <button class="btn btn-success" id="btn-val-measure-all" onclick="measureAllValidation()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    一键全测标准原色 (7色)
+                </button>
+                <button class="btn btn-sm" onclick="resetValidation()">重置记录</button>
+                <span id="val-progress-text" style="font-size:12px; color:var(--accent-blue); margin-left:auto;">就绪</span>
+            </div>
+
+            <!-- Primaries Table -->
+            <div style="max-height: 320px; overflow-y: auto; border:1px solid var(--border); border-radius:6px;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                    <thead style="background:var(--bg-tertiary); position:sticky; top:0; z-index:2;">
+                        <tr>
+                            <th style="padding:8px 10px;">基准原色</th>
+                            <th style="padding:8px 10px;">标准目标 (x, y)</th>
+                            <th style="padding:8px 10px;">物理实测 (x, y)</th>
+                            <th style="padding:8px 10px;">亮度 (nits)</th>
+                            <th style="padding:8px 10px;">偏差 Δxy</th>
+                            <th style="padding:8px 10px;">评定</th>
+                            <th style="padding:8px 10px; text-align:right;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="val-table-body">
+                        <!-- Dynamically populated -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Overall Assessment Verdict Card -->
+            <div id="val-verdict-card" style="margin-top:14px; padding:12px 16px; background:#0b1324; border-radius:8px; border:1px solid #1e3a8a; display:flex; align-items:center; gap:14px;">
+                <div id="val-verdict-badge" style="font-size:12px; font-weight:700; padding:4px 10px; border-radius:4px; background:#334155; color:#94a3b8;">
+                    待验证
+                </div>
+                <div style="flex:1;">
+                    <div id="val-verdict-title" style="font-size:13px; font-weight:600; color:#f8fafc;">尚未进行基准测试</div>
+                    <div id="val-verdict-desc" style="font-size:11px; color:#94a3b8; margin-top:2px;">点击上方“一键全测”验证显示屏在 DCI-P3 标准域内的校准水准与色度计精度。</div>
+                </div>
+                <div style="text-align:right; font-family:'SF Mono', monospace; font-size:11px; color:#94a3b8;" id="val-verdict-stats">
+                    平均 Δxy: --<br>已测: 0/7
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top:14px;">
+                <button class="btn btn-sm" onclick="closeValidationModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dependencies -->
+    <script src="/static/cie1931.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

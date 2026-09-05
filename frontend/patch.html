@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>外接电视专属测色靶窗 - 广色域打点测试与补差分析系统</title>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #ffffff;
+        }
+
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #000000;
+            transition: background-color 0.2s ease;
+        }
+
+        /* Test Patch Area - Defaults to transparent/black in Standby Mode */
+        #patch {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: transparent;
+            opacity: 0;
+            transition: opacity 0.25s ease, width 0.25s, height 0.25s, background-color 0.12s;
+            box-shadow: none;
+        }
+
+        #patch.active-color {
+            opacity: 1;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Patch Sizes */
+        .patch-10 {
+            width: 31.6vw;
+            height: 31.6vh;
+        }
+
+        .patch-20 {
+            width: 44.7vw;
+            height: 44.7vh;
+        }
+
+        .patch-50 {
+            width: 70.7vw;
+            height: 70.7vh;
+        }
+
+        .patch-100 {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Alignment Target Ring - Prominent in Standby for Probe Placement */
+        #target-crosshair {
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            border: 2px dashed rgba(56, 189, 248, 0.8);
+            border-radius: 50%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.95;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 0 22px rgba(56, 189, 248, 0.25);
+            z-index: 50;
+        }
+
+        #target-crosshair::before, #target-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(56, 189, 248, 0.85);
+        }
+
+        #target-crosshair::before {
+            width: 26px;
+            height: 2px;
+        }
+
+        #target-crosshair::after {
+            width: 2px;
+            height: 26px;
+        }
+
+        .crosshair-center-dot {
+            width: 4px;
+            height: 4px;
+            background: #38bdf8;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #38bdf8;
+        }
+
+        .crosshair-label {
+            position: absolute;
+            bottom: -32px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #38bdf8;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+            background: rgba(15, 23, 42, 0.7);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+
+        .hide-target #target-crosshair {
+            opacity: 0;
+        }
+
+        /* Floating Info HUD */
+        #hud {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 13px;
+            color: #e2e8f0;
+            z-index: 100;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        #hud.autohide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #hud h1 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .hud-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 3px;
+        }
+
+        .hud-val {
+            font-family: "SF Mono", Menlo, Monaco, monospace;
+            color: #f8fafc;
+        }
+
+        /* Control toolbar */
+        #toolbar {
+            position: fixed;
+            bottom: 16px;
+            display: flex;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 14px;
+            z-index: 100;
+            transition: opacity 0.3s ease;
+        }
+
+        #toolbar.autohide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        button {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #0284c7;
+            border-color: #38bdf8;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            margin-right: 6px;
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+        }
+
+        .hdr-tag {
+            background: rgba(236, 72, 153, 0.2);
+            color: #f472b6;
+            border: 1px solid rgba(236, 72, 153, 0.4);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* Dedicated Fullscreen Edge Flash Overlay */
+        #flash-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 9000;
+            opacity: 0;
+            box-shadow: inset 0 0 180px 60px #10b981, inset 0 0 40px 15px #34d399;
+            transition: opacity 0.2s ease;
+        }
+
+        @keyframes screenFlashPulse {
+            0% { opacity: 0; }
+            15% { opacity: 1; }
+            30% { opacity: 0.15; }
+            45% { opacity: 1; }
+            60% { opacity: 0.2; }
+            75% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        #flash-overlay.flashing {
+            animation: screenFlashPulse 3.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        /* Completion Notification Overlay */
+        #complete-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+        }
+
+        #complete-overlay.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .complete-card {
+            background: rgba(15, 23, 42, 0.96);
+            border: 2px solid #10b981;
+            border-radius: 16px;
+            padding: 32px 52px;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(16, 185, 129, 0.45), 0 20px 50px rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(16px);
+            animation: cardPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes cardPop {
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .complete-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            color: #10b981;
+            font-size: 32px;
+            margin-bottom: 14px;
+        }
+
+        .complete-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #f8fafc;
+            margin-bottom: 6px;
+        }
+
+        .complete-subtitle {
+            font-size: 13px;
+            color: #38bdf8;
+            font-family: "SF Mono", Menlo, monospace;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .complete-count {
+            font-size: 14px;
+            color: #cbd5e1;
+        }
+
+        .complete-tip {
+            margin-top: 14px;
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <!-- Screen Edge Pulse Flash Overlay -->
+    <div id="flash-overlay"></div>
+
+    <div id="container">
+        <!-- Target color square, hidden/transparent in Standby Mode -->
+        <div id="patch" class="patch-20"></div>
+
+        <!-- Positioning target frame with ring & crosshair for probe alignment -->
+        <div id="target-crosshair">
+            <div class="crosshair-center-dot"></div>
+            <span class="crosshair-label" id="crosshair-label">探头校色对准框</span>
+        </div>
+    </div>
+
+    <!-- Completion Overlay Banner -->
+    <div id="complete-overlay" onclick="dismissCompletionOverlay()">
+        <div class="complete-card">
+            <div class="complete-icon">✓</div>
+            <div class="complete-title" id="complete-title">全套点位测试已完成！</div>
+            <div class="complete-subtitle" id="complete-subtitle">ALL POINTS MEASURED SUCCESSFULLY</div>
+            <div class="complete-count" id="complete-count">全套 15 个测试坐标数据已同步生成</div>
+            <div class="complete-tip" id="complete-tip">[ 点击任意处或按任意键退出提醒 ]</div>
+        </div>
+    </div>
+
+    <!-- Info Overlay (Auto-hides on idle) -->
+    <div id="hud">
+        <h1>
+            <span id="hud-title-text">外接电视测色靶窗 (TV HDMI Target)</span>
+            <span class="hdr-tag" id="hud-hdr-tag">HDR 开启</span>
+        </h1>
+        <div class="hud-row">
+            <span><span id="lbl-status">状态</span>: <span class="status-dot" id="ws-dot"></span><span id="ws-text">连接中...</span></span>
+            <span><span id="lbl-curr-pt">当前点位</span>: <strong id="hud-point" class="hud-val">待机定位模式</strong></span>
+        </div>
+        <div class="hud-row">
+            <span><span id="lbl-target">需求值</span>: <span id="hud-target" class="hud-val">--</span></span>
+            <span><span id="lbl-container">信号容器</span>: <span id="hud-container" class="hud-val" style="color:#38bdf8">BT.2020</span></span>
+        </div>
+        <div class="hud-row">
+            <span><span id="lbl-rgb">RGB信号</span>: <span id="hud-rgb" class="hud-val">--</span></span>
+            <span><span id="lbl-clipped">裁切状态</span>: <span id="hud-clipped" class="hud-val">等待测色指令</span></span>
+        </div>
+    </div>
+
+    <!-- Quick Tool Buttons -->
+    <div id="toolbar">
+        <button id="btn-fs" onclick="toggleFullscreen()">全屏切换 [F]</button>
+        <button id="btn-size" onclick="cycleSize()"><span id="lbl-btn-size">靶窗尺寸</span> (<span id="btn-size-label">20%</span>) [S]</button>
+        <button id="btn-crosshair" onclick="toggleCrosshair()">准星开关 [H]</button>
+        <button id="btn-bg" onclick="toggleBackground()">背景黑/灰 [B]</button>
+        <button id="btn-reset" onclick="setStandbyMode()">复位待机 [C]</button>
+    </div>
+
+    <script>
+        const patch = document.getElementById('patch');
+        const container = document.getElementById('container');
+        const hud = document.getElementById('hud');
+        const toolbar = document.getElementById('toolbar');
+        const wsDot = document.getElementById('ws-dot');
+        const wsText = document.getElementById('ws-text');
+
+        let currentSize = 'patch-20';
+        const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+        const sizeLabels = {'patch-10': '10%', 'patch-20': '20%', 'patch-50': '50%', 'patch-100': '全屏'};
+
+        let hideTimer = null;
+        function resetHideTimer() {
+            hud.classList.remove('autohide');
+            toolbar.classList.remove('autohide');
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+                hud.classList.add('autohide');
+                toolbar.classList.add('autohide');
+            }, 3500);
+        }
+
+        window.addEventListener('mousemove', resetHideTimer);
+        resetHideTimer();
+
+        // Pleasant Audio Chime on Completion (Web Audio API)
+        function playCompletionChime() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const now = ctx.currentTime;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+
+                // Ascending melodic chime (C5 -> E5 -> G5 -> C6)
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.12);
+                osc.frequency.setValueAtTime(783.99, now + 0.24);
+                osc.frequency.setValueAtTime(1046.50, now + 0.36);
+
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+                osc.start(now);
+                osc.stop(now + 0.95);
+            } catch (e) {
+                console.log("Audio chime note:", e);
+            }
+        }
+
+        let currentLang = localStorage.getItem('app_lang') || 'zh';
+        const I18N = {
+            zh: {
+                page_title: "外接电视专属测色靶窗 - 广色域打点测试与补差分析系统",
+                crosshair: "探头校色对准框",
+                hud_title: "外接电视测色靶窗 (TV HDMI Target)",
+                hdr_mode: "HDR 模式 (BT.2020)",
+                sdr_mode: "SDR 模式",
+                lbl_status: "状态",
+                lbl_curr_pt: "当前点位",
+                lbl_target: "需求值",
+                lbl_container: "信号容器",
+                lbl_rgb: "RGB信号",
+                lbl_clipped: "裁切状态",
+                ws_connected: "已同步联动",
+                ws_disconnected: "连接断开，重试中...",
+                ws_connecting: "连接中...",
+                standby_mode: "待机定位 (请将探头对准中央框线)",
+                wait_cmd: "等待测色指令",
+                native_limit: "原生极限 (无裁切限制)",
+                clipped: "已溢出截断",
+                accurate: "精准映射",
+                native_passthrough: "Native 原生直通",
+                btn_fs: "全屏切换 [F]",
+                btn_size: "靶窗尺寸",
+                btn_crosshair: "准星开关 [H]",
+                btn_bg: "背景黑/灰 [B]",
+                btn_reset: "复位待机 [C]",
+                complete_batch_title: "全套点位测试已完成！",
+                complete_batch_sub: "ALL TARGET POINTS MEASURED SUCCESSFULLY",
+                complete_batch_desc: (n) => `全套 ${n} 个坐标点位光学采样已全部完成，实测数据与判定已同步至主控制台`,
+                complete_val_title: "标准原色校准验证完成！",
+                complete_val_sub: "COLORIMETER & DISPLAY VALIDATION COMPLETED",
+                complete_val_desc: "7 项标准原色光学采样全部完成，探头与出厂校色评估数据已更新",
+                complete_tip: "[ 点击任意处或按任意键退出提醒 ]"
+            },
+            en: {
+                page_title: "TV Target Window - Wide Gamut Target Testing & Offset Analysis System",
+                crosshair: "Probe Alignment Target",
+                hud_title: "TV Target Window (HDMI Target)",
+                hdr_mode: "HDR Mode (BT.2020)",
+                sdr_mode: "SDR Mode",
+                lbl_status: "Status",
+                lbl_curr_pt: "Target Point",
+                lbl_target: "Target xy",
+                lbl_container: "Container",
+                lbl_rgb: "RGB Signal",
+                lbl_clipped: "Gamut Clip",
+                ws_connected: "Linked",
+                ws_disconnected: "Disconnected, reconnecting...",
+                ws_connecting: "Connecting...",
+                standby_mode: "Standby (Align probe with crosshair)",
+                wait_cmd: "Awaiting Command",
+                native_limit: "Native Passthrough (Unclipped)",
+                clipped: "Clipped / Out of Gamut",
+                accurate: "Accurately Mapped",
+                native_passthrough: "Native Passthrough",
+                btn_fs: "Fullscreen [F]",
+                btn_size: "Patch Size",
+                btn_crosshair: "Crosshair [H]",
+                btn_bg: "Bg Black/Gray [B]",
+                btn_reset: "Standby [C]",
+                complete_batch_title: "Test Cycle Completed!",
+                complete_batch_sub: "ALL TARGET POINTS MEASURED SUCCESSFULLY",
+                complete_batch_desc: (n) => `Optical sampling for all ${n} points completed; data synchronized to console.`,
+                complete_val_title: "Validation Completed!",
+                complete_val_sub: "COLORIMETER & DISPLAY VALIDATION COMPLETED",
+                complete_val_desc: "All 7 standard reference colors measured; probe & factory calibration data updated.",
+                complete_tip: "[ Click anywhere or press any key to dismiss ]"
+            }
+        };
+
+        function getDict() {
+            return I18N[currentLang] || I18N.zh;
+        }
+
+        function applyLang() {
+            currentLang = localStorage.getItem('app_lang') || 'zh';
+            const dict = getDict();
+            document.title = dict.page_title;
+            const elCrosshair = document.getElementById('crosshair-label');
+            if (elCrosshair) elCrosshair.innerText = dict.crosshair;
+            const elHudTitle = document.getElementById('hud-title-text');
+            if (elHudTitle) elHudTitle.innerText = dict.hud_title;
+            const elLblStatus = document.getElementById('lbl-status');
+            if (elLblStatus) elLblStatus.innerText = dict.lbl_status;
+            const elLblCurrPt = document.getElementById('lbl-curr-pt');
+            if (elLblCurrPt) elLblCurrPt.innerText = dict.lbl_curr_pt;
+            const elLblTarget = document.getElementById('lbl-target');
+            if (elLblTarget) elLblTarget.innerText = dict.lbl_target;
+            const elLblContainer = document.getElementById('lbl-container');
+            if (elLblContainer) elLblContainer.innerText = dict.lbl_container;
+            const elLblRgb = document.getElementById('lbl-rgb');
+            if (elLblRgb) elLblRgb.innerText = dict.lbl_rgb;
+            const elLblClipped = document.getElementById('lbl-clipped');
+            if (elLblClipped) elLblClipped.innerText = dict.lbl_clipped;
+            const elBtnFs = document.getElementById('btn-fs');
+            if (elBtnFs) elBtnFs.innerText = dict.btn_fs;
+            const elLblBtnSize = document.getElementById('lbl-btn-size');
+            if (elLblBtnSize) elLblBtnSize.innerText = dict.btn_size;
+            const elBtnCrosshair = document.getElementById('btn-crosshair');
+            if (elBtnCrosshair) elBtnCrosshair.innerText = dict.btn_crosshair;
+            const elBtnBg = document.getElementById('btn-bg');
+            if (elBtnBg) elBtnBg.innerText = dict.btn_bg;
+            const elBtnReset = document.getElementById('btn-reset');
+            if (elBtnReset) elBtnReset.innerText = dict.btn_reset;
+            const elCompleteTip = document.getElementById('complete-tip');
+            if (elCompleteTip) elCompleteTip.innerText = dict.complete_tip;
+        }
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'app_lang') {
+                applyLang();
+            }
+        });
+
+        // Standby Mode: Black background, no color patch, only target crosshair visible
+        function setStandbyMode() {
+            const dict = getDict();
+            patch.classList.remove('active-color');
+            patch.style.backgroundColor = 'transparent';
+            document.getElementById('hud-point').innerText = dict.standby_mode;
+            document.getElementById('hud-target').innerText = '--';
+            document.getElementById('hud-rgb').innerText = '--';
+            const clippedEl = document.getElementById('hud-clipped');
+            clippedEl.innerText = dict.wait_cmd;
+            clippedEl.style.color = '#94a3b8';
+        }
+
+        let completeTimer = null;
+        function triggerCompletionFlash(title, subtitle, countText) {
+            playCompletionChime();
+            setStandbyMode(); // Immediately return patch to black/standby so display does not burn color
+
+            const flash = document.getElementById('flash-overlay');
+            if (flash) {
+                flash.classList.remove('flashing');
+                void flash.offsetWidth; // trigger reflow
+                flash.classList.add('flashing');
+            }
+
+            const overlay = document.getElementById('complete-overlay');
+            if (title) document.getElementById('complete-title').innerText = title;
+            if (subtitle) document.getElementById('complete-subtitle').innerText = subtitle;
+            if (countText) document.getElementById('complete-count').innerText = countText;
+
+            if (overlay) {
+                overlay.classList.add('active');
+                clearTimeout(completeTimer);
+                completeTimer = setTimeout(() => {
+                    overlay.classList.remove('active');
+                    if (flash) flash.classList.remove('flashing');
+                }, 6000);
+            }
+        }
+
+        function dismissCompletionOverlay() {
+            const overlay = document.getElementById('complete-overlay');
+            if (overlay) overlay.classList.remove('active');
+            const flash = document.getElementById('flash-overlay');
+            if (flash) flash.classList.remove('flashing');
+            clearTimeout(completeTimer);
+        }
+
+        function applyPatch(p) {
+            if (!p) return;
+            const dict = getDict();
+            patch.classList.add('active-color');
+
+            document.getElementById('hud-point').innerText = `${p.name || ('P' + p.point_id)} (P${p.point_id})`;
+            document.getElementById('hud-target').innerText = `x: ${p.target_x.toFixed(4)}, y: ${p.target_y.toFixed(4)}`;
+            
+            const isNative = p.container === 'native';
+            document.getElementById('hud-container').innerText = isNative ? dict.native_passthrough : (p.container || 'BT2020').toUpperCase();
+            document.getElementById('hud-hdr-tag').innerText = p.hdr_mode !== false ? dict.hdr_mode : dict.sdr_mode;
+
+            const r = (p.rgb && p.rgb[0] !== undefined) ? p.rgb[0] : 0;
+            const g = (p.rgb && p.rgb[1] !== undefined) ? p.rgb[1] : 0;
+            const b = (p.rgb && p.rgb[2] !== undefined) ? p.rgb[2] : 0;
+
+            document.getElementById('hud-rgb').innerText = `${(r*255).toFixed(0)}, ${(g*255).toFixed(0)}, ${(b*255).toFixed(0)}`;
+            const clippedEl = document.getElementById('hud-clipped');
+            
+            if (isNative) {
+                clippedEl.innerText = dict.native_limit;
+                clippedEl.style.color = '#10b981';
+            } else if (p.is_clipped) {
+                clippedEl.innerText = dict.clipped;
+                clippedEl.style.color = '#ef4444';
+            } else {
+                clippedEl.innerText = dict.accurate;
+                clippedEl.style.color = '#10b981';
+            }
+
+            // Set Color with CSS Color 4
+            if (p.is_black) {
+                patch.style.backgroundColor = '#000000';
+            } else if (isNative || p.container === 'bt2020') {
+                // Modern CSS Color Level 4: color(rec2020 r g b)
+                patch.style.backgroundColor = `color(rec2020 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
+            } else if (p.container === 'p3') {
+                patch.style.backgroundColor = `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`;
+            } else {
+                patch.style.backgroundColor = `rgb(${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)})`;
+            }
+
+            if (p.patch_size) {
+                const sCls = 'patch-' + p.patch_size.replace('%', '');
+                setSize(sCls);
+            }
+        }
+
+        function setSize(sCls) {
+            sizes.forEach(s => patch.classList.remove(s));
+            currentSize = sCls;
+            patch.classList.add(currentSize);
+            document.getElementById('btn-size-label').innerText = sizeLabels[currentSize];
+        }
+
+        function cycleSize() {
+            const nextIdx = (sizes.indexOf(currentSize) + 1) % sizes.length;
+            setSize(sizes[nextIdx]);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => console.warn(e));
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function toggleCrosshair() {
+            document.body.classList.toggle('hide-target');
+        }
+
+        function toggleBackground() {
+            const isBlack = container.style.backgroundColor === 'rgb(0, 0, 0)' || container.style.backgroundColor === '#000000' || container.style.backgroundColor === '';
+            container.style.backgroundColor = isBlack ? '#2e2e2e' : '#000000';
+        }
+
+        let ws = null;
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+            ws.onopen = () => {
+                const dict = getDict();
+                wsDot.classList.remove('disconnected');
+                wsText.innerText = dict.ws_connected;
+            };
+
+            ws.onclose = () => {
+                const dict = getDict();
+                wsDot.classList.add('disconnected');
+                wsText.innerText = dict.ws_disconnected;
+                setTimeout(connectWS, 1500);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const dict = getDict();
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'PATCH_DISPLAY' && msg.patch) {
+                        applyPatch(msg.patch);
+                    } else if (msg.type === 'STANDBY_MODE') {
+                        setStandbyMode();
+                    } else if (msg.type === 'INIT_STATE') {
+                        // Only display color if measurement is actively ongoing; otherwise stay in standby mode
+                        if (msg.state && msg.state.is_measuring && msg.state.active_patch) {
+                            applyPatch(msg.state.active_patch);
+                        } else {
+                            setStandbyMode();
+                        }
+                    } else if (msg.type === 'SETTINGS_UPDATED' && msg.settings) {
+                        document.getElementById('hud-hdr-tag').innerText = msg.settings.hdr_mode ? dict.hdr_mode : dict.sdr_mode;
+                    } else if (msg.type === 'BATCH_MEASURE_COMPLETED') {
+                        const total = msg.total_points || 15;
+                        triggerCompletionFlash(
+                            dict.complete_batch_title,
+                            dict.complete_batch_sub,
+                            dict.complete_batch_desc(total)
+                        );
+                    } else if (msg.type === 'VALIDATION_COMPLETED') {
+                        triggerCompletionFlash(
+                            dict.complete_val_title,
+                            dict.complete_val_sub,
+                            dict.complete_val_desc
+                        );
+                    }
+                } catch (e) {
+                    console.error("WS error:", e);
+                }
+            };
+        }
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === 'f') toggleFullscreen();
+            else if (key === 's') cycleSize();
+            else if (key === 'h') toggleCrosshair();
+            else if (key === 'b') toggleBackground();
+            else if (key === 'c') setStandbyMode();
+            else if (key === 'escape') dismissCompletionOverlay();
+        });
+
+        window.addEventListener('dblclick', toggleFullscreen);
+
+        // Apply initial language & guarantee Standby Mode on initial load (pure black + crosshair only)
+        applyLang();
+        setStandbyMode();
+        connectWS();
+    </script>
+</body>
+</html>
