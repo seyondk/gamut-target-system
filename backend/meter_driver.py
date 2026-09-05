@@ -238,8 +238,9 @@ class MeterDriver:
         triggered = False
         result = None
 
+        timeout = 30.0 if is_black else 20.0
         try:
-            while time.time() - start_time < 12.0:
+            while time.time() - start_time < timeout:
                 r, _, _ = select.select([master], [], [], 0.1)
                 if master in r:
                     try:
@@ -325,8 +326,9 @@ class MeterDriver:
         triggered = False
         result = None
 
+        timeout = 30.0 if is_black else 20.0
         try:
-            while time.time() - start_time < 12.0:
+            while time.time() - start_time < timeout:
                 try:
                     chunk = q.get(timeout=0.1)
                     output_accum += chunk
