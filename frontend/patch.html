@@ -448,20 +448,10 @@
         </div>
     </div>
 
-    <!-- True Fullscreen 1-Click Interactive Overlay -->
-    <div id="fs-entry-overlay" onclick="enterTrueFullscreen()" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000000; z-index:999999; flex-direction:column; align-items:center; justify-content:center; cursor:pointer;">
-        <div style="font-size: 56px; margin-bottom: 16px;">📺</div>
-        <div id="fs-entry-title" style="font-size: 26px; font-weight: 800; color: #38bdf8; margin-bottom: 10px; text-shadow: 0 0 20px rgba(56,189,248,0.5);">点击屏幕任意位置进入【真·全屏测色】</div>
-        <div id="fs-entry-sub" style="font-size: 15px; color: #94a3b8; margin-bottom: 24px;">100% 满屏纯黑无边框校色环境 / Click anywhere for True Fullscreen</div>
-        <div id="fs-entry-hint" style="padding: 8px 20px; background: rgba(56,189,248,0.12); border: 1px solid #38bdf8; border-radius: 22px; font-size: 13px; color: #38bdf8;">
-            按 [ESC] 退出全屏 ｜ 按 [T] 可随时切回置顶小窗
-        </div>
-    </div>
-
     <!-- Quick Tool Buttons -->
     <div id="toolbar">
-        <button id="btn-top" onclick="switchToPipWindow()" title="在系统最高层级置顶悬浮显示测色靶窗 (支持任意应用之上)"><span id="lbl-btn-top">📌 切换置顶小窗</span> [T]</button>
-        <button id="btn-fs" onclick="toggleFullscreen()">全屏切换 [F]</button>
+        <button id="btn-top" onclick="togglePinTop()" title="在系统最高层级置顶悬浮显示测色靶窗 (支持任意应用之上)"><span id="lbl-btn-top">📌 强制置顶</span> [T]</button>
+        <button id="btn-fs" onclick="toggleFullscreen()"><span id="lbl-btn-fs">全屏切换 [F]</span></button>
         <button id="btn-size" onclick="cycleSize()"><span id="lbl-btn-size">靶窗尺寸</span> (<span id="btn-size-label">20%</span>) [S]</button>
         <button id="btn-crosshair" onclick="toggleCrosshair()">准星开关 [H]</button>
         <button id="btn-bg" onclick="toggleBackground()">背景黑/灰 [B]</button>
@@ -783,37 +773,30 @@
             setSize(sizes[nextIdx]);
         }
 
-        function enterTrueFullscreen() {
-            const ov = document.getElementById('fs-entry-overlay');
-            if (ov) ov.style.display = 'none';
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(e => {
-                    console.warn("Fullscreen request warning:", e);
-                });
-            }
-        }
-
         function toggleFullscreen() {
-            const ov = document.getElementById('fs-entry-overlay');
-            if (ov) ov.style.display = 'none';
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(e => console.warn(e));
+                document.documentElement.requestFullscreen().catch(e => console.warn("Fullscreen request warning:", e));
             } else {
-                document.exitFullscreen().catch(e => console.warn(e));
+                document.exitFullscreen().catch(e => console.warn("Exit fullscreen warning:", e));
             }
         }
 
-        function switchToPipWindow() {
-            if (document.fullscreenElement) {
-                try { document.exitFullscreen(); } catch (e) {}
-            }
-            if (window.opener && typeof window.opener.toggleTVPatchWindow === 'function') {
-                window.opener.toggleTVPatchWindow();
-                window.close();
+        // Fullscreen state listener: Hide pinned button and update label when in fullscreen
+        document.addEventListener('fullscreenchange', () => {
+            const isFs = !!document.fullscreenElement;
+            const btnTop = document.getElementById('btn-top');
+            const lblBtnFs = document.getElementById('lbl-btn-fs');
+
+            if (isFs) {
+                // In fullscreen: HIDE the "置顶" button, show "Switch back to small window"
+                if (btnTop) btnTop.style.display = 'none';
+                if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Switch to Small Window [F]' : '切换回小窗 [F]';
             } else {
-                togglePinTop();
+                // In small window: SHOW the "置顶" button, show "Fullscreen [F]"
+                if (btnTop) btnTop.style.display = '';
+                if (lblBtnFs) lblBtnFs.innerText = currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]';
             }
-        }
+        });
 
         function toggleCrosshair() {
             document.body.classList.toggle('hide-target');
@@ -1139,28 +1122,20 @@
             else if (key === 'c') setStandbyMode();
             else if (key === 'escape') {
                 dismissCompletionOverlay();
-                const ov = document.getElementById('fs-entry-overlay');
-                if (ov) ov.style.display = 'none';
-                if (pipWindow) togglePinTop();
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                } else if (pipWindow) {
+                    togglePinTop();
+                }
             }
         }
 
         window.addEventListener('keydown', handleKeydown);
         window.addEventListener('dblclick', toggleFullscreen);
 
-        // Check for ?autofs=1 or ?fs=1 or ?top=1 in URL parameter
+        // Check for ?top=1 or ?pin=1 in URL parameter
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('autofs') || urlParams.has('fs')) {
-            // Attempt instant fullscreen
-            document.documentElement.requestFullscreen().then(() => {
-                const ov = document.getElementById('fs-entry-overlay');
-                if (ov) ov.style.display = 'none';
-            }).catch(() => {
-                // If browser requires user interaction in this document, show 1-click overlay
-                const ov = document.getElementById('fs-entry-overlay');
-                if (ov) ov.style.display = 'flex';
-            });
-        } else if (urlParams.has('top') || urlParams.has('pin')) {
+        if (urlParams.has('top') || urlParams.has('pin')) {
             window.addEventListener('click', () => {
                 if (!pipWindow && !isSoftwarePinned) {
                     togglePinTop();

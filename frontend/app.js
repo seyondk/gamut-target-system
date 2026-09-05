@@ -22,8 +22,7 @@ const I18N = {
         meter_connected: "硬件色度计已连接",
         meter_missing: "未检测到物理探头",
         val_btn: "标准原色校准验证",
-        tv_window_btn: "打开测色靶窗 (置顶)",
-        tv_fullscreen_btn: "全屏靶窗 (外接电视)",
+        tv_window_btn: "打开测色靶窗",
         tv_window_btn_pinned: "✓ 测色靶窗置顶中 (点击退出)",
         patch_size_10: "靶窗: 10% 面积",
         patch_size_20: "靶窗: 20% (标准)",
@@ -124,8 +123,7 @@ const I18N = {
         meter_connected: "Colorimeter Connected",
         meter_missing: "Colorimeter Disconnected",
         val_btn: "Primary Calibration Validation",
-        tv_window_btn: "Target Patch (Pinned)",
-        tv_fullscreen_btn: "Fullscreen Patch (External TV)",
+        tv_window_btn: "Open Target Patch",
         tv_window_btn_pinned: "✓ Target Patch Pinned (Click to exit)",
         patch_size_10: "Patch: 10% Area",
         patch_size_20: "Patch: 20% (Standard)",
@@ -1864,37 +1862,33 @@ async function toggleTVPatchWindow() {
     window.open('/patch', 'TVPatchWindow', 'width=800,height=800,menubar=no,toolbar=no,location=no,status=no');
 }
 
-// Backward compatibility alias so any legacy calls work seamlessly
+let patchWindowRef = null;
+
 function openTVPatchWindow() {
-    toggleTVPatchWindow();
+    if (patchWindowRef && !patchWindowRef.closed) {
+        patchWindowRef.focus();
+        return;
+    }
+    const w = 920;
+    const h = 640;
+    const left = Math.max(0, Math.round((window.screen.availWidth - w) / 2));
+    const top = Math.max(0, Math.round((window.screen.availHeight - h) / 2));
+    patchWindowRef = window.open(
+        '/patch',
+        'TVPatchWindow',
+        `left=${left},top=${top},width=${w},height=${h},menubar=no,toolbar=no,location=no,status=no`
+    );
+    if (patchWindowRef) {
+        patchWindowRef.focus();
+    }
+}
+
+function toggleTVPatchWindow() {
+    openTVPatchWindow();
 }
 
 function openFullscreenPatchWindow() {
-    if (activeDocPipWindow) {
-        try { activeDocPipWindow.close(); } catch (e) {}
-        activeDocPipWindow = null;
-        updatePatchButtonState(false);
-    }
-    if (document.pictureInPictureElement) {
-        try { document.exitPictureInPicture(); } catch (e) {}
-        updatePatchButtonState(false);
-    }
-
-    const s = window.screen;
-    const targetW = s ? (s.availWidth || 1920) : 1920;
-    const targetH = s ? (s.availHeight || 1080) : 1080;
-    const targetX = s ? (s.availLeft !== undefined ? s.availLeft : 0) : 0;
-    const targetY = s ? (s.availTop !== undefined ? s.availTop : 0) : 0;
-
-    const win = window.open(
-        '/patch?autofs=1',
-        'TVPatchFullscreenWindow',
-        `left=${targetX},top=${targetY},width=${targetW},height=${targetH},menubar=no,toolbar=no,location=no,status=no`
-    );
-    if (win) {
-        win.focus();
-    }
-    return win;
+    openTVPatchWindow();
 }
 
 function exportCSV() {
