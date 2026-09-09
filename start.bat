@@ -6,18 +6,19 @@ echo ==========================================================
 echo  Starting Wide Gamut Target Testing & Offset Analysis...
 echo ==========================================================
 
-:: Check Python installation
-python --version >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    py -3 --version >nul 2>&1
-    if %ERRORLEVEL% NEQ 0 (
+:: Check Python installation (prefer official Windows py launcher)
+py -3 --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    set PY_CMD=py -3
+) else (
+    python --version >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        set PY_CMD=python
+    ) else (
         echo [ERROR] Python 3 was not found. Please install Python 3.10+ and add it to PATH.
         pause
         exit /b 1
     )
-    set PY_CMD=py -3
-) else (
-    set PY_CMD=python
 )
 
 :: Install / Verify dependencies
@@ -33,10 +34,10 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') 
 
 :: Launch FastAPI backend
 echo [INFO] Starting backend server at http://127.0.0.1:8000 ...
-start "" %PY_CMD% backend/server.py
+start "" %PY_CMD% backend\server.py
 
 :: Wait for initialization
-timeout /t 2 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul 2>&1
 
 :: Open browser
 echo [INFO] Launching browser console...
