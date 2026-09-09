@@ -323,12 +323,16 @@ class MeterDriver:
 
     def _measure_hardware_windows(self, cmd: List[str], is_black: bool = False) -> Dict[str, Any]:
         """Windows threaded-pipe interactive communication with spotread."""
+        win_env = os.environ.copy()
+        win_env["ARGYLL_NOT_INTERACTIVE"] = "1"
+
         proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            bufsize=0
+            bufsize=0,
+            env=win_env
         )
 
         q: queue.Queue = queue.Queue()
@@ -348,6 +352,7 @@ class MeterDriver:
         output_accum = b""
         start_time = time.time()
         triggered = False
+        last_trigger_time = 0.0
         result = None
 
         timeout = 30.0 if is_black else 20.0
@@ -358,10 +363,16 @@ class MeterDriver:
                     output_accum += chunk
                     text = output_accum.decode("utf-8", errors="ignore")
 
-                    if "any other key to take a reading" in text and not triggered:
-                        proc.stdin.write(b" \n")
-                        proc.stdin.flush()
-                        triggered = True
+                    if "any other key to take a reading" in text:
+                        now = time.time()
+                        if not triggered or (now - last_trigger_time > 2.0 and not result):
+                            try:
+                                proc.stdin.write(b" \r\n")
+                                proc.stdin.flush()
+                            except Exception as write_err:
+                                logger.error(f"Error writing to spotread stdin: {write_err}")
+                            triggered = True
+                            last_trigger_time = now
 
                     match = re.search(
                         r"Result is XYZ:\s*([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+),\s*Yxy:\s*([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+)",
@@ -382,7 +393,7 @@ class MeterDriver:
                             "leakage_warning": is_black and (Y > 0.3)
                         }
                         try:
-                            proc.stdin.write(b"q\n")
+                            proc.stdin.write(b"q\r\n")
                             proc.stdin.flush()
                         except Exception:
                             pass
