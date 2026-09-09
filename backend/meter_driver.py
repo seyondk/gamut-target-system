@@ -78,17 +78,41 @@ class MeterDriver:
 
     def _find_spotread(self) -> Optional[str]:
         """Locates the spotread binary on macOS, Windows, or Linux."""
+        # 1. Project local directories
+        proj_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        local_candidates = [
+            os.path.join(proj_root, "ArgyllCMS", "bin", "spotread.exe" if os.name == "nt" else "spotread"),
+            os.path.join(proj_root, "bin", "spotread.exe" if os.name == "nt" else "spotread"),
+            os.path.join(proj_root, "spotread.exe" if os.name == "nt" else "spotread"),
+        ]
+        for p in local_candidates:
+            if os.path.isfile(p):
+                return p
+
+        # 2. Check predefined default paths
         for path in DEFAULT_SPOTREAD_SEARCH_PATHS:
-            if os.path.isfile(path) and os.access(path, os.X_OK):
+            if os.path.isfile(path) and (os.name == "nt" or os.access(path, os.X_OK)):
                 return path
         
+        # 3. Check system PATH
         bin_name = "spotread.exe" if os.name == "nt" else "spotread"
         which_path = shutil.which(bin_name) or shutil.which("spotread")
         if which_path:
             return which_path
             
-        # Recursive search in DisplayCAL directories
+        # 4. Windows dynamic wildcard search in C:\, D:\, Downloads
         if os.name == "nt":
+            wildcard_patterns = [
+                r"C:\Argyll*\bin\spotread.exe",
+                r"D:\Argyll*\bin\spotread.exe",
+                r"C:\Program Files*\Argyll*\bin\spotread.exe",
+                os.path.expanduser(r"~\Downloads\Argyll*\bin\spotread.exe"),
+            ]
+            for pat in wildcard_patterns:
+                m = glob.glob(pat)
+                if m:
+                    return m[0]
+
             appdata = os.environ.get("APPDATA", "")
             if appdata:
                 pattern = os.path.join(appdata, "DisplayCAL", "dl", "**", "spotread.exe")
