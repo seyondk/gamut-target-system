@@ -562,6 +562,12 @@ function updateUIFromState(stateData) {
             selDelay.value = stateData.settings.auto_delay.toFixed(1);
         }
 
+        const selPatchSize = document.getElementById('select-patch-size');
+        if (selPatchSize && stateData.settings.patch_size) {
+            selPatchSize.value = stateData.settings.patch_size;
+            patchDisplayOptions.size = 'patch-' + stateData.settings.patch_size.replace('%', '');
+        }
+
         const chkHdr = document.getElementById('chk-hdr-mode');
         if (chkHdr && stateData.settings.hdr_mode !== undefined) {
             chkHdr.checked = stateData.settings.hdr_mode;
@@ -673,8 +679,11 @@ function renderTable() {
         `;
 
         const targetRgb = pt.target_rgb_255 || pt.rgb_255;
+        const targetRgb10 = pt.target_rgb_1023 || pt.rgb_1023;
         const rgbDisplay = (targetRgb && targetRgb.length >= 3) ? 
-            `<span class="mono" style="color:#e2e8f0; font-size:11px;" title="RGB (0-255)">(${targetRgb[0]}, ${targetRgb[1]}, ${targetRgb[2]})</span>` : 
+            `<span class="mono" style="color:#e2e8f0; font-size:11px;" title="10-bit: (${targetRgb10 ? targetRgb10.join(', ') : '--'}) | 8-bit: (${targetRgb.join(', ')})">
+                ${targetRgb10 ? `(${targetRgb10.join(', ')}) <span style="color:#38bdf8; font-size:9px; font-weight:600;">10b</span>` : `(${targetRgb.join(', ')})`}
+            </span>` : 
             '<span style="color:var(--text-muted)">--</span>';
 
         // Action buttons: Delete available for ALL points (P1-P15 and custom points)
@@ -1145,6 +1154,19 @@ async function toggleFlareComp() {
     });
 }
 
+async function updatePatchSize() {
+    const sel = document.getElementById('select-patch-size');
+    if (!sel) return;
+    const val = sel.value;
+    patchDisplayOptions.size = 'patch-' + val.replace('%', '');
+    updateTargetPatchDisplay(currentTargetPatch);
+    await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch_size: val })
+    });
+}
+
 // ==========================================
 // Always-on-Top Target Patch Window Pipeline
 // Supports Document PiP (Chromium) & Universal Video Canvas PiP (Safari/Firefox/All)
@@ -1154,7 +1176,7 @@ let activeDocPipWindow = null;
 let pipStream = null;
 let currentTargetPatch = null;
 let patchDisplayOptions = {
-    size: 'patch-20',
+    size: 'patch-10',
     bg: '#000000',
     crosshair: true,
     flashActive: false,
@@ -1206,8 +1228,10 @@ function renderTargetCanvas() {
 
     // 2. Render Patch Color Box (if active)
     if (p && !p.is_standby) {
-        let sizeRatio = 0.447; // default patch-20
-        if (patchDisplayOptions.size === 'patch-10') sizeRatio = 0.316;
+        let sizeRatio = 0.316; // default patch-10
+        if (patchDisplayOptions.size === 'patch-5') sizeRatio = 0.224;
+        else if (patchDisplayOptions.size === 'patch-10') sizeRatio = 0.316;
+        else if (patchDisplayOptions.size === 'patch-20') sizeRatio = 0.447;
         else if (patchDisplayOptions.size === 'patch-50') sizeRatio = 0.707;
         else if (patchDisplayOptions.size === 'patch-100') sizeRatio = 1.0;
 
@@ -1289,7 +1313,10 @@ function renderTargetCanvas() {
             ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
             ctx.fillText(subText, cx, pillY + pillH + 20);
         } else if (p.rgb) {
-            const rgbText = `RGB: [${Math.round(p.rgb[0]*255)}, ${Math.round(p.rgb[1]*255)}, ${Math.round(p.rgb[2]*255)}] · ${p.container?.toUpperCase() || 'BT2020'}`;
+            const r10 = Math.round((p.rgb[0] || 0) * 1023);
+            const g10 = Math.round((p.rgb[1] || 0) * 1023);
+            const b10 = Math.round((p.rgb[2] || 0) * 1023);
+            const rgbText = `RGB (10-bit): [${r10}, ${g10}, ${b10}] · ${p.container?.toUpperCase() || 'BT2020'}`;
             ctx.font = '13px SF Mono, Menlo, monospace';
             ctx.fillStyle = 'rgba(248, 250, 252, 0.9)';
             ctx.fillText(rgbText, cx, pillY + pillH + 20);
@@ -1396,6 +1423,7 @@ function setupDocumentPipWindow(pip) {
                 transition: opacity 0.25s ease, width 0.25s, height 0.25s, background-color 0.12s;
             }
             #patch.active-color { opacity: 1; box-shadow: 0 0 2px rgba(0, 0, 0, 0.8); }
+            .patch-5 { width: 22.4vw; height: 22.4vh; }
             .patch-10 { width: 31.6vw; height: 31.6vh; }
             .patch-20 { width: 44.7vw; height: 44.7vh; }
             .patch-50 { width: 70.7vw; height: 70.7vh; }
@@ -1539,7 +1567,7 @@ function setupDocumentPipWindow(pip) {
 
         <div id="toolbar">
             <button class="tool-btn" id="btn-fs">${currentLang === 'en' ? 'Fullscreen [F]' : '全屏切换 [F]'}</button>
-            <button class="tool-btn" id="btn-size"><span id="lbl-btn-size">${currentLang === 'en' ? 'Patch Size' : '靶窗尺寸'}</span> (<span id="btn-size-label">20%</span>) [S]</button>
+            <button class="tool-btn" id="btn-size"><span id="lbl-btn-size">${currentLang === 'en' ? 'Patch Size' : '靶窗尺寸'}</span> (<span id="btn-size-label">10%</span>) [S]</button>
             <button class="tool-btn" id="btn-crosshair">${currentLang === 'en' ? 'Crosshair [H]' : '准星开关 [H]'}</button>
             <button class="tool-btn" id="btn-bg">${currentLang === 'en' ? 'Bg Black/Gray [B]' : '背景黑/灰 [B]'}</button>
             <button class="tool-btn" id="btn-reset">${currentLang === 'en' ? 'Standby [C]' : '复位待机 [C]'}</button>
@@ -1587,21 +1615,32 @@ function setupDocumentPipWindow(pip) {
         updatePatchButtonState(false);
     }
 
-    // 3. Cycle Patch Size (10% -> 20% -> 50% -> 100% Fullscreen)
-    function cycleSize() {
-        const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+    // 3. Cycle Patch Size (5% -> 10% -> 20% -> 50% -> 100% Fullscreen)
+    async function cycleSize() {
+        const sizes = ['patch-5', 'patch-10', 'patch-20', 'patch-50', 'patch-100'];
         const sizeLabels = {
+            'patch-5': '5%',
             'patch-10': '10%',
             'patch-20': '20%',
             'patch-50': '50%',
             'patch-100': currentLang === 'en' ? '100%' : '全屏'
         };
-        const curIdx = sizes.indexOf(patchDisplayOptions.size || 'patch-20');
+        const curIdx = sizes.indexOf(patchDisplayOptions.size || 'patch-10');
         const nextSize = sizes[(curIdx + 1) % sizes.length];
         patchDisplayOptions.size = nextSize;
         updateTargetPatchDisplay(currentTargetPatch);
         const lbl = doc.getElementById('btn-size-label');
         if (lbl) lbl.innerText = sizeLabels[nextSize];
+        const val = sizeLabels[nextSize].replace('全屏', '100%');
+        const sel = document.getElementById('select-patch-size');
+        if (sel) sel.value = val;
+        try {
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patch_size: val })
+            });
+        } catch (e) {}
     }
 
     // 4. Toggle Alignment Crosshair
@@ -1686,16 +1725,17 @@ function updateDocPipDOM() {
     if (!patchEl) return;
 
     // Apply size class
-    const sizes = ['patch-10', 'patch-20', 'patch-50', 'patch-100'];
+    const sizes = ['patch-5', 'patch-10', 'patch-20', 'patch-50', 'patch-100'];
     const sizeLabels = {
+        'patch-5': '5%',
         'patch-10': '10%',
         'patch-20': '20%',
         'patch-50': '50%',
         'patch-100': currentLang === 'en' ? '100%' : '全屏'
     };
     sizes.forEach(s => patchEl.classList.remove(s));
-    patchEl.classList.add(patchDisplayOptions.size || 'patch-20');
-    if (btnSizeLabel) btnSizeLabel.innerText = sizeLabels[patchDisplayOptions.size || 'patch-20'];
+    patchEl.classList.add(patchDisplayOptions.size || 'patch-10');
+    if (btnSizeLabel) btnSizeLabel.innerText = sizeLabels[patchDisplayOptions.size || 'patch-10'];
 
     if (container) container.style.backgroundColor = patchDisplayOptions.bg || '#000000';
 
@@ -1735,7 +1775,10 @@ function updateDocPipDOM() {
         if (hudHdr) {
             hudHdr.innerText = p.hdr_mode !== false ? (currentLang === 'en' ? 'HDR Mode' : 'HDR 开启') : (currentLang === 'en' ? 'SDR Mode' : 'SDR 模式');
         }
-        if (hudRgb) hudRgb.innerText = `${Math.round(r*255)}, ${Math.round(g*255)}, ${Math.round(b*255)}`;
+        const r10 = Math.round(r * 1023);
+        const g10 = Math.round(g * 1023);
+        const b10 = Math.round(b * 1023);
+        if (hudRgb) hudRgb.innerText = `${r10}, ${g10}, ${b10} (10b)`;
         if (hudClipped) {
             if (p.container === 'native') {
                 hudClipped.innerText = currentLang === 'en' ? 'Native Passthrough (Unclipped)' : '原生极限 (无裁切限制)';

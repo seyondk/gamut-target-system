@@ -952,8 +952,20 @@
                         <strong style="color:#f472b6;" data-i18n="hdr_label">HDR 模式</strong>
                     </label>
 
-                    <!-- Container Selection (With Native Option) -->
+                    <!-- Patch Window Size Selection -->
                     <div style="display:flex; align-items:center; gap:6px; font-size:12px; margin-left:auto;">
+                        <span style="color:var(--text-muted)" data-i18n="patch_size_label">靶窗尺寸:</span>
+                        <select id="select-patch-size" onchange="updatePatchSize()" title="推荐 5% 或 10% 消除 MiniLED 光晕与 ABL 功率限制">
+                            <option value="5%">5% (超小/防光晕)</option>
+                            <option value="10%" selected>10% (行业标准)</option>
+                            <option value="20%">20% (传统)</option>
+                            <option value="50%">50%</option>
+                            <option value="100%">100% 全屏</option>
+                        </select>
+                    </div>
+
+                    <!-- Container Selection (With Native Option) -->
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px;">
                         <span style="color:var(--text-muted)" data-i18n="container_label">信号容器:</span>
                         <select id="select-container" onchange="updateContainerSpace()">
                             <option value="native">Native 原生直通 (无截断)</option>

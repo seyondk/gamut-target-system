@@ -50,7 +50,7 @@ class AppState:
     def __init__(self):
         self.settings = {
             "container_space": "bt2020",      # bt2020 | p3 | srgb | native
-            "patch_size": "20%",              # 10% | 20% | 50% | 100%
+            "patch_size": "10%",              # 5% | 10% | 20% | 50% | 100%
             "background": "black",            # black | gray18
             "apply_flare_comp": False,
             "hdr_mode": True,                 # HDR EOTF simulation
@@ -149,7 +149,9 @@ class AppState:
         container = self.settings.get("container_space", "bt2020")
         target_rgb_cur = pt.get(f"rgb_{container}", pt["rgb_bt2020"])
         pt["target_rgb_255"] = [round(max(0.0, min(1.0, c)) * 255) for c in target_rgb_cur]
+        pt["target_rgb_1023"] = [round(max(0.0, min(1.0, c)) * 1023) for c in target_rgb_cur]
         pt["rgb_255"] = pt["target_rgb_255"]
+        pt["rgb_1023"] = pt["target_rgb_1023"]
         pt["effective_target_x"] = pt["target_x"]
         pt["effective_target_y"] = pt["target_y"]
 
@@ -188,7 +190,9 @@ class AppState:
                 # Target nominal RGB directly from demand value (target_x, target_y)
                 target_rgb = xy_to_container_rgb(pt["target_x"], pt["target_y"], container)
                 pt["target_rgb_255"] = [round(max(0.0, min(1.0, c)) * 255) for c in target_rgb[:3]]
+                pt["target_rgb_1023"] = [round(max(0.0, min(1.0, c)) * 1023) for c in target_rgb[:3]]
                 pt["rgb_255"] = pt["target_rgb_255"]
+                pt["rgb_1023"] = pt["target_rgb_1023"]
                 break
 
     def recompute_all(self):
@@ -739,7 +743,8 @@ def export_csv():
         "Offset_dx", "Offset_dy",
         "Adjusted_Target_x", "Adjusted_Target_y",
         "Delta_uv",
-        "RGB_Value",
+        "RGB_8bit",
+        "RGB_10bit",
         "Target_Exceeds_P3", "Measured_Exceeds_P3", "Test_Verdict"
     ])
     for pt in state.points:
@@ -758,7 +763,9 @@ def export_csv():
             verdict_en = str(verdict)
 
         target_rgb = pt.get("target_rgb_255", pt.get("rgb_255"))
+        target_rgb_10 = pt.get("target_rgb_1023", pt.get("rgb_1023"))
         rgb_str = f"({target_rgb[0]}, {target_rgb[1]}, {target_rgb[2]})" if target_rgb else ""
+        rgb_10_str = f"({target_rgb_10[0]}, {target_rgb_10[1]}, {target_rgb_10[2]})" if target_rgb_10 else ""
         adj_x = pt.get("effective_target_x", pt["target_x"] + pt["offset_x"])
         adj_y = pt.get("effective_target_y", pt["target_y"] + pt["offset_y"])
 
@@ -777,6 +784,7 @@ def export_csv():
             f"{adj_y:.4f}",
             f"{pt['delta_uv']:.4f}" if pt.get("delta_uv") is not None else "",
             rgb_str,
+            rgb_10_str,
             "YES" if pt.get("target_exceeds_p3") else "NO",
             "YES" if pt.get("measured_exceeds_p3") is True else ("NO" if pt.get("measured_exceeds_p3") is False else ""),
             verdict_en
